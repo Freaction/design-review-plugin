@@ -1,0 +1,11 @@
+{
+  "name": "Design Review",
+  "id": "123456789",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["none"]
+  }
+}

@@ -1,0 +1,116 @@
+Этот плагин нужен для дизайн-ревью со стороны команды дизайн-системы. У нас есть эталонный юай кит, в котором находятся компоненты, а также 4 библиотеки переменных, которые подключаются по мере надобности. Их 4 из-за ограничений фигмы, сейчас у нас 140 модов, а это 140 брендов. Плагин должен быть построен на модульной архитектуре и esbuild, который будет собирать как фронт-енд, так и бек-енд. Необходимо, чтобы каждый модуль был в своем файле, и чтобы компоненты были построены также модульно, т.е. для каждого компонента свой css-файл, а не огромное большое полотно. Работай только в папке main
+
+Суть плагина вот в чем:
+1. Нужно разработать автоматизацию для выявления в фичевом макете:
+
+2. оверрайдов на компонентах ДС (сверка компонентов в макете с эталонным китом)
+
+3. старых версий компонентов ДС (сверка компонентов в макете с эталонным китом)
+
+4. раздетаченных компонентов
+
+5. некорректного использования переменных для текстов (для текстов должны использоваться только переменные с неймингом text.., description…, label…
+
+вот полный список текстовых переменных
+
+В компоненте mText для цвета нужно оставить только допустимые значения. Согласно списку:
+Базовые (для ДС / лайаутов / фичевых компонентов):
+text/title
+text/base
+text/secondary
+text/muted
+text/transparent
+text/primary
+text/minor
+text/info
+text/success
+text/attantion
+text/warning
+text/danger
+text/vip
+text-inverse/title
+text-inverse/base
+text-inverse/secondary
+text-inverse/muted
+text-inverse/transparent
+text/on/primary
+text/on/secondary
+text/on/dander
+text/on/success
+text/on/vip
+Компонентные (для ДС):
+title/basic/text-color
+title/basic/description-color
+title/basic/description-color
+modal-description-color-accent
+Компонентные (для лайаутов):
+GAME-CARD
+utilities/game-card/like/text-color
+utilities/game-card/like/text-color-active
+utilities/game-card/like/text-color-checked
+utilities/game-card/like/text-color-hover
+utilities/game-card/live/bet/text-color
+utilities/game-card/live/seat/text-color
+utilities/game-card/title/game-text-color-finish
+utilities/game-card/title/game-text-color-start
+utilities/game-card/title/provider-text-color
+
+NAVBAR
+utilities/navbar/text-color
+utilities/navbar/text-color-active
+utilities/navbar/text-color-hover
+
+MENU
+utilities/footer/menu/text-color
+utilities/footer/menu/text-color-hover
+utilities/menu/top/amount/text-color
+utilities/menu/top/amount/text-color-focus
+utilities/menu/top/amount/text-color-hover
+
+USER-MENU
+utilities/user-menu/description-color
+utilities/user-menu/email-text-color
+utilities/user-menu/header-text-color
+utilities/user-menu/text-color
+utilities/user-menu/title-color
+utilities/user-menu/value-color
+
+FOOTER
+utilities/footer/description-color
+utilities/footer/link-text-color
+utilities/footer/text-color
+utilities/footer/title-color
+
+SIDEBAR
+
+(у самого сайдбара нет цветовых токенов для текста, они все разделены на sidebar-card и sidebar list)
+
+SIDEBAR-CARD
+utilities/sidebar-card/referal/description-color
+utilities/sidebar-card/referal/description-color-hover
+utilities/sidebar-card/referal/text-color
+utilities/sidebar-card/referal/text-color-hover
+utilities/sidebar-card/widget/description-color
+utilities/sidebar-card/widget/description-color-hover
+utilities/sidebar-card/widget/text-color
+utilities/sidebar-card/widget/text-color-hover
+
+SIDEBAR-LIST
+utilities/sidebar-list/header/text-color
+utilities/sidebar-list/header/text-color-hover
+utilities/sidebar-list/row/text-color
+utilities/sidebar-list/row/text-color-hover
+
+6. раздетаченных текстовых стилей
+
+7. использования примитивов, вместо переменных 2го и 3го уровня
+
+8. использования хексов, вместо переменных
+
+9. некорректного использования семантических переменных (надо подумать по какому критерию)
+
+10. некорректное использование “целевых“ переменных для градиентов gradient/bonus, gradient/gamefication, которые должны использоваться только в кейсах связанных с бонусами и геймификациями соответственно (тут возможно находить автоматически, а оценивать корректность применения уже ситуационно)
+
+Я пока не понимаю, что конкретно можно автоматизировать и как, поэтому будем действовать по мере разработки, допиливать идеи по ходу дела. Главное, сделать хорошую базу, чтобы можно было на ее основе строить плагин. Движок должен быть идеален по производительности и компактности. Возможно, получится расширить список автоматизаций?
+
+Я это вижу так что плагин будет иметь настраиваемое окошко, чтобы помещалось побольше функционала. Я, например, могу сканировать документ, страницу или выделенную секцию, и плагин отображает warning и alert компоненты, стили, переменные, хардкод. 

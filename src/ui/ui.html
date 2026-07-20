@@ -1,0 +1,95 @@
+<div class="container">
+  <!-- Tabs from TODO -->
+  <div class="tabs">
+    <div class="tabs-left">
+      <button class="tab-button active" data-page="main">Самопроверка</button>
+      <button class="tab-button" data-page="scan">Скан эталона ДС</button>
+    </div>
+    <button class="btn-expand" id="toggle-theme" title="Сменить тему">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.4 9.75977C13.7985 9.94219 13.1603 10.0403 12.4992 10.0403C8.88723 10.0403 5.95912 7.11218 5.95912 3.50018C5.95912 2.83937 6.05713 2.20145 6.23939 1.60016C3.55444 2.41441 1.6001 4.90885 1.6001 7.85975C1.6001 11.4718 4.5282 14.3999 8.1402 14.3999C11.0914 14.3999 13.586 12.4451 14.4 9.75977Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="btn-expand" id="toggle-size" title="Изменить размер">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.76502 1.60001H14.3995M14.3995 1.60001V6.23449M14.3995 1.60001L8.9926 7.00691M6.23483 14.4H1.60034M1.60034 14.4V9.76552M1.60034 14.4L7.00724 8.99311" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+
+  <div class="page active" id="page-main">
+    <div class="header-info">
+      <div class="title">Плагин для проведения дизайн-ревью</div>
+      <div class="subtitle">Используется для сверки макетов с UI-Kit</div>
+      <div id="snapshot-status">
+        <span class="status-text">Эталон не загружен — откройте UI-Kit и </span>
+        <span class="status-text status-link" id="go-to-scan-tab">отсканируйте его</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="buttons-row">
+      <button class="btn-new-task" id="scan-selection">
+        <div class="cta-inner-border"></div>
+        <span>Скан выделенного</span>
+      </button>
+      <button class="btn-new-task" id="scan-page">
+        <div class="cta-inner-border"></div>
+        <span>Скан страницы</span>
+      </button>
+    </div>
+
+    <div class="divider"></div>
+
+    <label class="switch-wrapper">
+      <input type="checkbox" class="switch-input" id="group-issues-switch" checked>
+      <div class="switch-track"></div>
+      <div class="switch-label">Группировать одинаковые ошибки</div>
+    </label>
+
+    <div class="divider"></div>
+
+    <div class="sub-tabs">
+      <div class="sub-tab active" data-tab="components">
+        Компоненты <span class="count" id="count-components">0</span>
+      </div>
+      <div class="sub-tab" data-tab="variables">
+        Токены и стили <span class="count" id="count-variables">0</span>
+      </div>
+      <div class="sub-tab" data-tab="gradients">
+        Градиенты <span class="count" id="count-gradients">0</span>
+      </div>
+    </div>
+
+    <div class="stats-info" id="stats" style="display: none;">
+      <div class="stats-time">
+        <div class="icon-btn" id="stats-icon" style="width: 16px; height: 16px; display: none;"></div>
+        <span id="stats-time-text">Проверено 0 слоев за 0с</span>
+      </div>
+      <div class="stats-counts">
+        <div class="stat-item"><div class="dot-icon dot-error"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg></div><span id="stats-error">0 блокер</span></div>
+        <div class="stat-item"><div class="dot-icon dot-warning"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg></div><span id="stats-warning">0 предупр.</span></div>
+        <div class="stat-item"><div class="dot-icon dot-info"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg></div><span id="stats-info">0 инфо</span></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div id="results-components" class="results-list" style="display: none;"></div>
+    <div id="results-variables" class="results-list" style="display: none;"></div>
+    <div id="results-gradients" class="results-list" style="display: none;"></div>
+    <div class="empty-state" id="empty-state" style="display: flex;">
+      <div class="empty-state-text">Отсканируйте макет, чтобы увидеть ошибки</div>
+    </div>
+  </div>
+
+  <div class="page" id="page-scan">
+    <div class="scan-area">
+      <button class="btn-new-task" id="update-snapshot" style="width: auto;">
+        <div class="cta-inner-border"></div>
+        <span id="update-snapshot-text">Обнови эталон ДС</span>
+      </button>
+      <div class="scan-area-text" id="scan-snapshot-status">
+        <span class="status-text" id="scan-status-text1">Эталон не загружен — откройте UI-Kit и </span>
+        <span class="status-text status-link" id="scan-status-text2" style="text-decoration: underline;">отсканируйте его</span>
+      </div>
+    </div>
+  </div>
+</div>
