@@ -4,6 +4,7 @@
     <div class="tabs-left">
       <button class="tab-button active" data-page="main">Самопроверка</button>
       <button class="tab-button" data-page="scan">Скан эталона ДС</button>
+      <button class="tab-button" data-page="migrator">Миграция</button>
     </div>
     <button class="btn-expand" id="toggle-theme" title="Сменить тему">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.4 9.75977C13.7985 9.94219 13.1603 10.0403 12.4992 10.0403C8.88723 10.0403 5.95912 7.11218 5.95912 3.50018C5.95912 2.83937 6.05713 2.20145 6.23939 1.60016C3.55444 2.41441 1.6001 4.90885 1.6001 7.85975C1.6001 11.4718 4.5282 14.3999 8.1402 14.3999C11.0914 14.3999 13.586 12.4451 14.4 9.75977Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -15,8 +16,8 @@
 
   <div class="page active" id="page-main">
     <div class="header-info">
-      <div class="title">Плагин для проведения дизайн-ревью</div>
-      <div class="subtitle">Используется для сверки макетов с UI-Kit</div>
+      <div class="title">Самопроверка макетов</div>
+      <div class="subtitle">Вкладка нужна для сверки макетов с дизайн-системой.</div>
       <div id="snapshot-status">
         <span class="status-text">Эталон не загружен — откройте UI-Kit и </span>
         <span class="status-text status-link" id="go-to-scan-tab">отсканируйте его</span>
@@ -89,6 +90,95 @@
       <div class="scan-area-text" id="scan-snapshot-status">
         <span class="status-text" id="scan-status-text1">Эталон не загружен — откройте UI-Kit и </span>
         <span class="status-text status-link" id="scan-status-text2" style="text-decoration: underline;">отсканируйте его</span>
+      </div>
+    </div>
+  </div>
+  <div class="page" id="page-migrator" style="position: relative; height: 100%;">
+    <div id="migrator-scroll" style="flex: 1; overflow-y: auto; padding-bottom: 72px; padding-top: 16px;">
+      <!-- Title & Subtitle -->
+      <div class="header-info">
+        <div class="title">Миграция и проверка токенов</div>
+        <div class="subtitle">Находит устаревшие переменные и позволяет переназначать библиотеки, чтобы свапать бренды.</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Scan Buttons -->
+      <div class="buttons-row" style="margin-bottom: 16px;">
+        <button class="btn-new-task" id="btnScanSelection">
+          <div class="cta-inner-border"></div>
+          <span>Скан выделенного</span>
+        </button>
+        <button class="btn-new-task" id="btnScanPage">
+          <div class="cta-inner-border"></div>
+          <span>Скан страницы</span>
+        </button>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Stats area -->
+      <div id="migrator-stats-area" class="hidden stats-info" style="margin-top: 16px; margin-bottom: 16px;">
+        <div class="stats-time">
+          <div class="icon-btn" style="width: 16px; height: 16px; display: flex;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.2 5.59998L6.42698 10.4L4.79999 8.76379" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <span id="migrator-time-text">Проверено 0 слоев за 0с</span>
+        </div>
+        <div class="stats-counts">
+          <div class="stat-item"><div class="dot-icon dot-info"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg></div><span id="migrator-nodes-count">0 ноды</span></div>
+          <div class="stat-item"><div class="dot-icon dot-warning"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg></div><span id="migrator-vars-count">0 переменных</span></div>
+          <div class="stat-item"><div class="dot-icon dot-error"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg></div><span id="migrator-notfound-count">0 не найдено</span></div>
+        </div>
+        <div class="divider" style="margin-top: 16px;"></div>
+      </div>
+
+      <!-- Libraries Area -->
+      <div id="libraries-section" style="display: flex; flex-direction: column; gap: 8px; margin-top: 16px;">
+        <div style="font-weight: 500; font-size: 12px; color: black; text-align: left;">Выберите нужную библиотеку для проверки или миграции</div>
+        <div class="lib-tree-wrapper" style="border-radius: 6px; outline: 1px solid rgba(0,0,0,0.1); outline-offset: -1px; max-height: 224px; overflow-y: auto; overflow-x: hidden;">
+          <div id="libList" style="display: flex; flex-direction: column;">
+            <div style="color: var(--color-black-40); padding: 8px; font-size: 12px;">Загрузка библиотек...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider" id="migrator-results-divider" class="hidden" style="margin-top: 16px;"></div>
+
+      <!-- Results Area -->
+      <div id="panelResult" class="hidden" style="display: flex; flex-direction: column; gap: 6px; margin-top: 16px;">
+        <div style="font-weight: 500; font-size: 12px; color: black; text-align: left; margin-bottom: 6px;">Результаты сканирования</div>
+        <div class="sub-tabs">
+          <div class="sub-tab active" id="tab-notfound">
+            Не найдено / устарели <span class="count" id="tab-notfound-count">0</span>
+          </div>
+          <div class="sub-tab" id="tab-allvars">
+            Все переменные <span class="count" id="tab-allvars-count">0</span>
+          </div>
+        </div>
+        
+        <!-- Results list -->
+        <div id="varList" class="var-list" style="display: flex; flex-direction: column; gap: 6px; padding: 0; padding-top: 6px;"></div>
+        
+        <div id="notFoundActions" class="hidden" style="display: flex; gap: 6px; margin-top: 8px;">
+           <button class="btn btn-ghost btn-sm" id="btnCopyNotFound">Копировать</button>
+           <button class="btn btn-warn btn-sm" id="btnDetach">Отвязать</button>
+        </div>
+        <div id="errorMsgs" class="msgs hidden"></div>
+      </div>
+    </div> <!-- migrator-scroll -->
+    
+    <!-- Pinned bottom buttons -->
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 12px; background: white;">
+      <div class="buttons-row">
+        <button class="btn-new-task" id="btnCheckMigrate" disabled>
+          <div class="cta-inner-border"></div>
+          <span>Проверить переменные</span>
+        </button>
+        <button class="btn-new-task" id="btnMigrate" disabled>
+          <div class="cta-inner-border"></div>
+          <span>Заменить переменные</span>
+        </button>
       </div>
     </div>
   </div>
