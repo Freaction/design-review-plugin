@@ -1,6 +1,37 @@
 "use strict";
 (() => {
+  var __defProp = Object.defineProperty;
+  var __defProps = Object.defineProperties;
+  var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
   var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __propIsEnum = Object.prototype.propertyIsEnumerable;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __spreadValues = (a, b) => {
+    for (var prop in b || (b = {}))
+      if (__hasOwnProp.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    if (__getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(b)) {
+        if (__propIsEnum.call(b, prop))
+          __defNormalProp(a, prop, b[prop]);
+      }
+    return a;
+  };
+  var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+  var __objRest = (source, exclude) => {
+    var target = {};
+    for (var prop in source)
+      if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
+        target[prop] = source[prop];
+    if (source != null && __getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(source)) {
+        if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
+          target[prop] = source[prop];
+      }
+    return target;
+  };
   var __esm = (fn, res, err) => function __init() {
     if (err) throw err[0];
     try {
@@ -1052,6 +1083,129 @@
     }
   });
 
+  // src/plugin/migrator/helpers.ts
+  function isAlias(v) {
+    return !!v && typeof v === "object" && v.type === "VARIABLE_ALIAS";
+  }
+  function isGradient(paint) {
+    return paint.type === "GRADIENT_LINEAR" || paint.type === "GRADIENT_RADIAL" || paint.type === "GRADIENT_ANGULAR" || paint.type === "GRADIENT_DIAMOND";
+  }
+  function hasFills(node) {
+    return "fills" in node && node.fills !== figma.mixed;
+  }
+  var init_helpers = __esm({
+    "src/plugin/migrator/helpers.ts"() {
+      "use strict";
+    }
+  });
+
+  // src/plugin/migrator/scan.ts
+  function addLoc(map, id, loc) {
+    let arr = map.get(id);
+    if (!arr) {
+      arr = [];
+      map.set(id, arr);
+    }
+    arr.push(loc);
+  }
+  function scanNode(node, map) {
+    var _a, _b;
+    const hasBV = "boundVariables" in node && node.boundVariables;
+    const hasFillsBV = "fills" in node && node.fills !== figma.mixed && Array.isArray(node.fills);
+    const hasStrBV = "strokes" in node && Array.isArray(node.strokes);
+    const hasEfxBV = "effects" in node && Array.isArray(node.effects);
+    if (!hasBV && !hasFillsBV && !hasStrBV && !hasEfxBV) return;
+    const nId = node.id;
+    const nName = node.name;
+    if (hasBV) {
+      const bv = node.boundVariables;
+      for (let i = 0; i < ALL_FIELDS.length; i++) {
+        const field = ALL_FIELDS[i];
+        const alias = bv[field];
+        if (isAlias(alias)) addLoc(map, alias.id, { nodeId: nId, nodeName: nName, kind: "field", field });
+      }
+    }
+    if (hasFillsBV) {
+      const fills = node.fills;
+      for (let i = 0; i < fills.length; i++) {
+        const fill = fills[i];
+        if (fill.type === "SOLID") {
+          const alias = (_a = fill.boundVariables) == null ? void 0 : _a.color;
+          if (alias) addLoc(map, alias.id, { nodeId: nId, nodeName: nName, kind: "fill", index: i, field: "color" });
+        }
+        if (isGradient(fill)) {
+          const stops = fill.gradientStops;
+          for (let j = 0; j < stops.length; j++) {
+            const stopBv = stops[j].boundVariables;
+            if (stopBv == null ? void 0 : stopBv.color) addLoc(map, stopBv.color.id, { nodeId: nId, nodeName: nName, kind: "gradientStop", fillIndex: i, stopIndex: j });
+          }
+        }
+      }
+    }
+    if (hasStrBV) {
+      const strokes = node.strokes;
+      for (let i = 0; i < strokes.length; i++) {
+        const s = strokes[i];
+        if (s.type === "SOLID") {
+          const alias = (_b = s.boundVariables) == null ? void 0 : _b.color;
+          if (alias) addLoc(map, alias.id, { nodeId: nId, nodeName: nName, kind: "stroke", index: i, field: "color" });
+        }
+      }
+    }
+    if (hasEfxBV) {
+      const effects = node.effects;
+      for (let i = 0; i < effects.length; i++) {
+        const bv = effects[i].boundVariables;
+        if (!bv) continue;
+        for (let fi = 0; fi < EFFECT_FIELDS.length; fi++) {
+          const field = EFFECT_FIELDS[fi];
+          const alias = bv[field];
+          if (isAlias(alias)) addLoc(map, alias.id, { nodeId: nId, nodeName: nName, kind: "effect", index: i, field });
+        }
+      }
+    }
+  }
+  var NODE_FIELDS, TEXT_FIELDS, ALL_FIELDS, EFFECT_FIELDS;
+  var init_scan = __esm({
+    "src/plugin/migrator/scan.ts"() {
+      "use strict";
+      init_helpers();
+      NODE_FIELDS = [
+        "width",
+        "height",
+        "opacity",
+        "cornerRadius",
+        "topLeftRadius",
+        "topRightRadius",
+        "bottomLeftRadius",
+        "bottomRightRadius",
+        "strokeWeight",
+        "paddingTop",
+        "paddingBottom",
+        "paddingLeft",
+        "paddingRight",
+        "itemSpacing",
+        "counterAxisSpacing",
+        "minWidth",
+        "maxWidth",
+        "minHeight",
+        "maxHeight"
+      ];
+      TEXT_FIELDS = [
+        "fontFamily",
+        "fontStyle",
+        "fontWeight",
+        "fontSize",
+        "lineHeight",
+        "letterSpacing",
+        "paragraphSpacing",
+        "paragraphIndent"
+      ];
+      ALL_FIELDS = [...NODE_FIELDS, ...TEXT_FIELDS];
+      EFFECT_FIELDS = ["color", "offsetX", "offsetY", "blur", "spread", "radius"];
+    }
+  });
+
   // src/plugin/scan-config.ts
   var SCAN_NODE_TYPES, FIGJAM_SKIP_TYPES;
   var init_scan_config = __esm({
@@ -1110,8 +1264,8 @@
     }
     return parts.slice(0, 2).join(" / ");
   }
-  function scanNode(_0, _1, _2) {
-    return __async(this, arguments, function* (node, results, snapshot, insideComponent = false, breadcrumb = "", onProgress, counter = { n: 0 }) {
+  function scanNode2(_0, _1, _2) {
+    return __async(this, arguments, function* (node, results, snapshot, insideComponent = false, breadcrumb = "", onProgress, counter = { n: 0 }, migratorMap) {
       var _a;
       if ("visible" in node && !node.visible) return;
       if (FIGJAM_SKIP_TYPES.has(node.type)) return;
@@ -1124,6 +1278,7 @@
       }
       const isComp = insideComponent || node.type === "INSTANCE" || node.type === "COMPONENT" || node.type === "COMPONENT_SET";
       const nodeBreadcrumb = breadcrumb || (((_a = node.parent) == null ? void 0 : _a.type) === "PAGE" ? node.name : getBreadcrumb(node));
+      scanNode(node, migratorMap);
       const needsComponentValidation = node.type === "INSTANCE" || node.type === "FRAME" || node.type === "COMPONENT_SET" || node.type === "COMPONENT";
       if (needsComponentValidation) {
         yield validateComponent(node, results, snapshot, nodeBreadcrumb);
@@ -1140,7 +1295,7 @@
       if (node.type === "VECTOR" || node.type === "BOOLEAN_OPERATION") return;
       if ("children" in node) {
         for (const child of node.children) {
-          yield scanNode(child, results, snapshot, isComp, nodeBreadcrumb, onProgress, counter);
+          yield scanNode2(child, results, snapshot, isComp, nodeBreadcrumb, onProgress, counter, migratorMap);
         }
       }
     });
@@ -1153,6 +1308,7 @@
       init_gradients();
       init_effects();
       init_cache();
+      init_scan();
       init_scan_config();
     }
   });
@@ -1263,12 +1419,344 @@
     }
   });
 
+  // src/plugin/migrator/scanHandler.ts
+  function hydrateSync(rawMap) {
+    var _a;
+    const result = /* @__PURE__ */ new Map();
+    const collectionCache = /* @__PURE__ */ new Map();
+    for (const [variableId, locations] of rawMap.entries()) {
+      const variable = figma.variables.getVariableById(variableId);
+      if (!variable) continue;
+      const colId = variable.variableCollectionId;
+      let colName = collectionCache.get(colId);
+      if (colName === void 0) {
+        const col = figma.variables.getVariableCollectionById(colId);
+        colName = (_a = col == null ? void 0 : col.name) != null ? _a : "(unknown)";
+        collectionCache.set(colId, colName);
+      }
+      result.set(variableId, {
+        variableId,
+        variableName: variable.name,
+        collectionName: colName,
+        locations
+      });
+    }
+    return result;
+  }
+  function processMigratorResults(rawMap, totalNodes, tTotal) {
+    scanData = hydrateSync(rawMap);
+    const variables = Array.from(scanData.values()).map((u) => ({
+      variableId: u.variableId,
+      variableName: u.variableName,
+      collectionName: u.collectionName,
+      locationCount: u.locations.length
+    }));
+    return { variables, nodeCount: totalNodes };
+  }
+  var scanData;
+  var init_scanHandler = __esm({
+    "src/plugin/migrator/scanHandler.ts"() {
+      "use strict";
+      scanData = null;
+    }
+  });
+
+  // src/plugin/migrator/utils.ts
+  function ms(start) {
+    const diff = perf.now() - start;
+    if (diff < 1e3) return `${diff}ms`;
+    const sec = diff / 1e3;
+    if (sec < 60) return `${sec.toFixed(1)}s`;
+    const min = Math.floor(sec / 60);
+    const rSec = Math.floor(sec % 60);
+    return `${min}m ${rSec}s`;
+  }
+  function send(type, payload = {}) {
+    figma.ui.postMessage(__spreadValues({ type }, payload));
+  }
+  function withRetry(fn, label = "", maxAttempts = 6) {
+    return __async(this, null, function* () {
+      const DELAYS = [1e3, 2e3, 4e3, 8e3, 16e3];
+      for (let i = 0; i < maxAttempts; i++) {
+        try {
+          return yield fn();
+        } catch (err) {
+          const isRate = (err instanceof Error ? err.message : String(err)).toLowerCase().includes("429");
+          if (!isRate || i === maxAttempts - 1) throw err;
+          const delay = DELAYS[Math.min(i, DELAYS.length - 1)];
+          console.warn(`429 rate-limit [${label}] \u2014 retry in ${delay / 1e3}s`);
+          yield new Promise((r) => setTimeout(r, delay));
+        }
+      }
+      throw new Error("withRetry: unreachable");
+    });
+  }
+  var perf;
+  var init_utils = __esm({
+    "src/plugin/migrator/utils.ts"() {
+      "use strict";
+      perf = { now: () => Date.now() };
+    }
+  });
+
+  // src/plugin/migrator/libraries.ts
+  function onGetLibraries() {
+    return __async(this, null, function* () {
+      const t = perf.now();
+      const cols = yield figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
+      console.log(`Libraries: ${cols.length} collections, ${ms(t)}`);
+      const collections = cols.map((c) => ({
+        key: c.key,
+        name: c.name,
+        libraryName: c.libraryName
+      }));
+      send("LIBRARIES_LOADED", { collections });
+    });
+  }
+  var init_libraries = __esm({
+    "src/plugin/migrator/libraries.ts"() {
+      "use strict";
+      init_utils();
+    }
+  });
+
+  // src/plugin/migrator/apply.ts
+  function applyVariable(loc, variable) {
+    const node = figma.getNodeById(loc.nodeId);
+    if (!node) return;
+    switch (loc.kind) {
+      case "field": {
+        node.setBoundVariable(loc.field, variable);
+        break;
+      }
+      case "fill": {
+        if (!hasFills(node)) break;
+        const fills = [...node.fills];
+        const fill = fills[loc.index];
+        if (!fill || fill.type !== "SOLID") break;
+        fills[loc.index] = figma.variables.setBoundVariableForPaint(fill, "color", variable);
+        node.fills = fills;
+        break;
+      }
+      case "gradientStop": {
+        if (!hasFills(node)) break;
+        const fills = [...node.fills];
+        const fill = fills[loc.fillIndex];
+        if (!fill || !isGradient(fill)) break;
+        const newStops = fill.gradientStops.map(
+          (stop, j) => j !== loc.stopIndex ? stop : __spreadProps(__spreadValues({}, stop), { boundVariables: { color: figma.variables.createVariableAlias(variable) } })
+        );
+        fills[loc.fillIndex] = __spreadProps(__spreadValues({}, fill), { gradientStops: newStops });
+        node.fills = fills;
+        break;
+      }
+      case "stroke": {
+        if (!("strokes" in node)) break;
+        const strokes = [...node.strokes];
+        const stroke = strokes[loc.index];
+        if (!stroke || stroke.type !== "SOLID") break;
+        strokes[loc.index] = figma.variables.setBoundVariableForPaint(stroke, "color", variable);
+        node.strokes = strokes;
+        break;
+      }
+      case "effect": {
+        if (!("effects" in node)) break;
+        const effects = [...node.effects];
+        const effect = effects[loc.index];
+        if (!effect) break;
+        effects[loc.index] = figma.variables.setBoundVariableForEffect(
+          effect,
+          loc.field,
+          variable
+        );
+        node.effects = effects;
+        break;
+      }
+    }
+  }
+  var init_apply = __esm({
+    "src/plugin/migrator/apply.ts"() {
+      "use strict";
+      init_helpers();
+    }
+  });
+
+  // src/plugin/migrator/migrate.ts
+  function onMigrate(scanData2, collectionKeys, dryRun = false) {
+    return __async(this, null, function* () {
+      const tTotal = perf.now();
+      const nameToKey = /* @__PURE__ */ new Map();
+      for (const key of collectionKeys) {
+        try {
+          const vars = yield withRetry(
+            () => figma.teamLibrary.getVariablesInLibraryCollectionAsync(key),
+            key.slice(0, 8)
+          );
+          for (const v of vars) {
+            if (!nameToKey.has(v.name)) nameToKey.set(v.name, v.key);
+          }
+        } catch (e) {
+          console.warn(`Collection [${key.slice(0, 8)}] unavailable: ${e}`);
+        }
+      }
+      const toImport = [];
+      const notFound = [];
+      const errors = [];
+      let replaced = 0;
+      for (const [, usage] of scanData2) {
+        const targetKey = nameToKey.get(usage.variableName);
+        if (!targetKey) {
+          notFound.push(usage.variableName);
+          continue;
+        }
+        toImport.push({ usage, targetKey });
+        if (dryRun) replaced += usage.locations.length;
+      }
+      if (dryRun) {
+        const elapsed2 = ms(tTotal);
+        console.log(`Migrate (dryRun): ${replaced} replaced, ${notFound.length} not found, ${errors.length} errors, ${elapsed2}`);
+        send("MIGRATE_COMPLETE", { result: { replaced, notFound, errors }, elapsed: elapsed2, dryRun });
+        return;
+      }
+      const BATCH = 5;
+      const totalToMigrate = toImport.length;
+      send("MIGRATE_START", { total: totalToMigrate });
+      for (let i = 0; i < totalToMigrate; i += BATCH) {
+        const batch = toImport.slice(i, i + BATCH);
+        const results = yield Promise.all(
+          batch.map(
+            (item) => withRetry(() => figma.variables.importVariableByKeyAsync(item.targetKey), item.usage.variableName).then((newVar) => ({ ok: true, newVar, usage: item.usage })).catch((e) => ({ ok: false, error: String(e), usage: item.usage }))
+          )
+        );
+        for (const result of results) {
+          if (!result.ok) {
+            errors.push(`Import failed: ${result.usage.variableName}`);
+            continue;
+          }
+          for (const loc of result.usage.locations) {
+            try {
+              applyVariable(loc, result.newVar);
+              replaced++;
+            } catch (e) {
+              errors.push(`Apply failed: ${result.usage.variableName} \u2192 "${loc.nodeName}"`);
+            }
+          }
+        }
+        const current = Math.min(i + BATCH, totalToMigrate);
+        send("MIGRATE_PROGRESS", { current, total: totalToMigrate, replaced, elapsed: ms(tTotal) });
+        if (current < totalToMigrate) {
+          yield new Promise((r) => setTimeout(r, 1));
+        }
+      }
+      const elapsed = ms(tTotal);
+      console.log(`Migrate: ${replaced} replaced, ${notFound.length} not found, ${errors.length} errors, ${elapsed}`);
+      send("MIGRATE_COMPLETE", { result: { replaced, notFound, errors }, elapsed });
+    });
+  }
+  var init_migrate = __esm({
+    "src/plugin/migrator/migrate.ts"() {
+      "use strict";
+      init_utils();
+      init_apply();
+    }
+  });
+
+  // src/plugin/migrator/detach.ts
+  function detachLocation(loc) {
+    const node = figma.getNodeById(loc.nodeId);
+    if (!node) return;
+    switch (loc.kind) {
+      case "field": {
+        node.setBoundVariable(loc.field, null);
+        break;
+      }
+      case "fill": {
+        if (!hasFills(node)) break;
+        const fills = [...node.fills];
+        const fill = fills[loc.index];
+        if (!fill || fill.type !== "SOLID") break;
+        const _a = fill, { boundVariables: _bv } = _a, rest = __objRest(_a, ["boundVariables"]);
+        fills[loc.index] = __spreadValues({}, rest);
+        node.fills = fills;
+        break;
+      }
+      case "gradientStop": {
+        if (!hasFills(node)) break;
+        const fills = [...node.fills];
+        const fill = fills[loc.fillIndex];
+        if (!fill || !isGradient(fill)) break;
+        const newStops = fill.gradientStops.map((stop, j) => {
+          if (j !== loc.stopIndex) return stop;
+          const _a2 = stop, { boundVariables: _bv } = _a2, rest = __objRest(_a2, ["boundVariables"]);
+          return __spreadValues({}, rest);
+        });
+        fills[loc.fillIndex] = __spreadProps(__spreadValues({}, fill), { gradientStops: newStops });
+        node.fills = fills;
+        break;
+      }
+      case "stroke": {
+        if (!("strokes" in node)) break;
+        const strokes = [...node.strokes];
+        const stroke = strokes[loc.index];
+        if (!stroke || stroke.type !== "SOLID") break;
+        const _b = stroke, { boundVariables: _bv } = _b, rest = __objRest(_b, ["boundVariables"]);
+        strokes[loc.index] = __spreadValues({}, rest);
+        node.strokes = strokes;
+        break;
+      }
+      case "effect": {
+        if (!("effects" in node)) break;
+        const effects = [...node.effects];
+        const effect = effects[loc.index];
+        if (!effect) break;
+        const _c = effect, { boundVariables: _bv } = _c, rest = __objRest(_c, ["boundVariables"]);
+        effects[loc.index] = __spreadValues({}, rest);
+        node.effects = effects;
+        break;
+      }
+    }
+  }
+  function onDetachNotFound(scanData2, notFoundNames) {
+    if (!notFoundNames.length) {
+      send("DETACH_COMPLETE", { result: { detached: 0, errors: [] } });
+      return;
+    }
+    const nameSet = new Set(notFoundNames);
+    let detached = 0;
+    const errors = [];
+    for (const [, usage] of scanData2) {
+      if (!nameSet.has(usage.variableName)) continue;
+      for (const loc of usage.locations) {
+        try {
+          detachLocation(loc);
+          detached++;
+        } catch (e) {
+          errors.push(`Detach failed: ${usage.variableName} \u2192 "${loc.nodeName}"`);
+        }
+      }
+    }
+    console.log(`Detach: ${detached} detached, ${errors.length} errors`);
+    send("DETACH_COMPLETE", { result: { detached, errors } });
+  }
+  var init_detach = __esm({
+    "src/plugin/migrator/detach.ts"() {
+      "use strict";
+      init_utils();
+      init_helpers();
+    }
+  });
+
   // src/plugin/code.ts
   var require_code = __commonJS({
     "src/plugin/code.ts"(exports) {
       init_scanner();
       init_snapshot();
       init_scan_config();
+      init_scanHandler();
+      init_libraries();
+      init_migrate();
+      init_detach();
+      init_utils();
       figma.showUI(__html__, { width: 450, height: 600, themeColors: true });
       (() => __async(null, null, function* () {
         const meta = yield loadSnapshotMeta();
@@ -1285,27 +1773,31 @@
           figma.ui.postMessage({ type: "init-theme", theme });
         }
       }))();
-      figma.ui.onmessage = (msg) => __async(null, null, function* () {
-        var _a;
-        if (msg.type === "scan-selection" || msg.type === "scan-page") {
-          const roots = msg.type === "scan-selection" ? figma.currentPage.selection : figma.currentPage.children;
+      function runGlobalScan(type, roots) {
+        return __async(this, null, function* () {
+          var _a;
           if (roots.length === 0) {
             figma.notify("\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u0434\u043B\u044F \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u044F");
             return;
           }
           const t0 = Date.now();
-          console.log(`[Design Review] \u0417\u0430\u043F\u0443\u0441\u043A \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u044F (${msg.type})... \u0421\u043E\u0431\u0438\u0440\u0430\u0435\u043C \u0443\u0437\u043B\u044B...`);
+          console.log(`[Design Review] \u0417\u0430\u043F\u0443\u0441\u043A \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u044F (${type})... \u0421\u043E\u0431\u0438\u0440\u0430\u0435\u043C \u0443\u0437\u043B\u044B...`);
           figma.skipInvisibleInstanceChildren = true;
           let totalNodesToScan = 0;
-          if (msg.type === "scan-selection") {
-            for (const root of figma.currentPage.selection) {
+          if (type === "scan-selection") {
+            for (const root of roots) {
               totalNodesToScan++;
               if ("findAllWithCriteria" in root) {
                 totalNodesToScan += root.findAllWithCriteria({ types: SCAN_NODE_TYPES }).length;
               }
             }
           } else {
-            totalNodesToScan = figma.currentPage.findAllWithCriteria({ types: SCAN_NODE_TYPES }).length;
+            for (const root of roots) {
+              totalNodesToScan++;
+              if ("findAllWithCriteria" in root) {
+                totalNodesToScan += root.findAllWithCriteria({ types: SCAN_NODE_TYPES }).length;
+              }
+            }
           }
           console.log(`[Design Review] \u0423\u0437\u043B\u044B \u0441\u043E\u0431\u0440\u0430\u043D\u044B \u0437\u0430 ${Date.now() - t0}\u043C\u0441. \u0412\u0441\u0435\u0433\u043E \u0443\u0437\u043B\u043E\u0432: ${totalNodesToScan}`);
           figma.ui.postMessage({ type: "scan-start", total: totalNodesToScan });
@@ -1326,13 +1818,24 @@
           const counter = { n: 0 };
           const onProgress = (count) => {
             figma.ui.postMessage({ type: "scan-progress", count });
+            send("SCAN_PROGRESS", { nodeCount: count, total: totalNodesToScan, elapsed: `${Date.now() - t1}ms` });
           };
+          const migratorMap = /* @__PURE__ */ new Map();
           for (const node of roots) {
-            yield scanNode(node, results, snapshot, false, "", onProgress, counter);
+            yield scanNode2(node, results, snapshot, false, "", onProgress, counter, migratorMap);
           }
           const totalIssues = results.components.length + results.variables.length + results.gradients.length;
-          console.log(`[Design Review] \u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E \u0437\u0430 ${Date.now() - t1}\u043C\u0441. \u041F\u0440\u043E\u0432\u0435\u0440\u0435\u043D\u043E: ${counter.n}. \u041D\u0430\u0439\u0434\u0435\u043D\u043E \u043E\u0448\u0438\u0431\u043E\u043A: ${totalIssues}`);
-          figma.ui.postMessage({ type: "scan-results", results, scannedCount: counter.n, totalIssues });
+          const elapsed = Date.now() - t1;
+          console.log(`[Design Review] \u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E \u0437\u0430 ${elapsed}\u043C\u0441. \u041F\u0440\u043E\u0432\u0435\u0440\u0435\u043D\u043E: ${counter.n}. \u041D\u0430\u0439\u0434\u0435\u043D\u043E \u043E\u0448\u0438\u0431\u043E\u043A: ${totalIssues}`);
+          const migratorResult = processMigratorResults(migratorMap, counter.n, t1);
+          figma.ui.postMessage({ type: "scan-results", results, scannedCount: counter.n, totalIssues, migratorResult, elapsed: `${elapsed}ms` });
+        });
+      }
+      figma.ui.onmessage = (msg) => __async(null, null, function* () {
+        var _a;
+        if (msg.type === "scan-selection" || msg.type === "scan-page") {
+          const roots = msg.type === "scan-selection" ? figma.currentPage.selection : figma.currentPage.children;
+          yield runGlobalScan(msg.type, roots);
         }
         if (msg.type === "focus-node") {
           const node = yield figma.getNodeByIdAsync(msg.nodeId);
@@ -1352,6 +1855,35 @@
         }
         if (msg.type === "save-theme") {
           yield figma.clientStorage.setAsync("theme", msg.theme);
+        }
+        try {
+          if (msg.type === "GET_LIBRARIES") {
+            yield onGetLibraries();
+          } else if (msg.type === "MIGRATE") {
+            if (!scanData || scanData.size === 0) throw new Error("\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u0438 \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435.");
+            if (!((_a = msg.collectionKeys) == null ? void 0 : _a.length)) throw new Error("\u0412\u044B\u0431\u0435\u0440\u0438 \u0445\u043E\u0442\u044F \u0431\u044B \u043E\u0434\u043D\u0443 \u043A\u043E\u043B\u043B\u0435\u043A\u0446\u0438\u044E.");
+            yield onMigrate(scanData, msg.collectionKeys, msg.dryRun);
+          } else if (msg.type === "DETACH_NOT_FOUND") {
+            if (!scanData || scanData.size === 0) throw new Error("\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u0438 \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435.");
+            onDetachNotFound(scanData, msg.names);
+          } else if (msg.type === "SCAN") {
+            const scope = msg.scope;
+            const scanType = scope === "selection" ? "scan-selection" : "scan-page";
+            let roots = [];
+            if (scope === "selection") {
+              roots = figma.currentPage.selection;
+            } else if (scope === "document") {
+              roots = [];
+              for (const page of figma.root.children) {
+                roots.push(...page.children);
+              }
+            } else {
+              roots = figma.currentPage.children;
+            }
+            yield runGlobalScan(scanType, roots);
+          }
+        } catch (err) {
+          send("ERROR", { message: err instanceof Error ? err.message : String(err) });
         }
       });
     }

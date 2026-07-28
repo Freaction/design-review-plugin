@@ -1,4 +1,23 @@
 // Theme switching
+import { 
+  initScanButton, 
+  initMigrateButton, 
+  initCopyButton, 
+  initDetachButton,
+  initTabs,
+  handleMigratorMessage 
+} from './migrator/handlers.js';
+
+// Init Migrator UI
+initScanButton();
+initMigrateButton();
+initCopyButton();
+initDetachButton();
+initTabs();
+
+// Load target libraries for Migrator immediately
+parent.postMessage({ pluginMessage: { type: 'GET_LIBRARIES' } }, '*');
+
 const themeBtn = document.getElementById('toggle-theme')!;
 const sunSVG = '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 2V3M8 13V14M2 8H3M13 8H14M3.76 3.76L4.47 4.47M11.53 11.53L12.24 12.24M12.24 3.76L11.53 4.47M4.47 11.53L3.76 12.24" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>';
 const moonSVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.4 9.75977C13.7985 9.94219 13.1603 10.0403 12.4992 10.0403C8.88723 10.0403 5.95912 7.11218 5.95912 3.50018C5.95912 2.83937 6.05713 2.20145 6.23939 1.60016C3.55444 2.41441 1.6001 4.90885 1.6001 7.85975C1.6001 11.4718 4.5282 14.3999 8.1402 14.3999C11.0914 14.3999 13.586 12.4451 14.4 9.75977Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -208,6 +227,9 @@ window.onmessage = async (event) => {
       applyTheme();
   }
 
+  // Pass messages to Migrator directly
+  handleMigratorMessage(pluginMessage);
+
   if (pluginMessage.type === 'snapshot-progress') {
     const text1 = document.getElementById('scan-status-text1');
     const text2 = document.getElementById('scan-status-text2');
@@ -281,8 +303,16 @@ window.onmessage = async (event) => {
   if (pluginMessage.type === 'scan-results') {
     latestRawResults = pluginMessage;
     renderResults(latestRawResults);
+    
+    // Also trigger migrator update
+    handleMigratorMessage({ 
+        type: 'SCAN_COMPLETE', 
+        result: pluginMessage.migratorResult,
+        elapsed: pluginMessage.elapsed
+    });
   }
 };
+
 
 (window as any).focusNode = (nodeId: string) => {
   parent.postMessage({ pluginMessage: { type: 'focus-node', nodeId } }, '*');

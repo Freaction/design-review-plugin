@@ -4,6 +4,8 @@ import { validateGradients } from './validators/gradients';
 import { validateEffects } from './validators/effects';
 import type { ComponentSnapshot } from './snapshot';
 import { clearCaches } from './cache';
+import { scanNode as scanNodeForMigrator } from './migrator/scan';
+import type { BindingLocation } from './migrator/types';
 import { FIGJAM_SKIP_TYPES } from './scan-config';
 
 export function isIconNode(node: BaseNode): boolean {
@@ -40,7 +42,8 @@ export async function scanNode(
   insideComponent: boolean = false,
   breadcrumb: string = '',
   onProgress?: (count: number) => void,
-  counter: { n: number } = { n: 0 }
+  counter: { n: number } = { n: 0 },
+  migratorMap: Map<string, BindingLocation[]>
 ): Promise<void> {
   if ('visible' in node && !node.visible) return;
   if (FIGJAM_SKIP_TYPES.has(node.type)) return;
@@ -63,6 +66,8 @@ export async function scanNode(
 
   const nodeBreadcrumb = breadcrumb || (node.parent?.type === 'PAGE' ? node.name : getBreadcrumb(node));
 
+  scanNodeForMigrator(node, migratorMap);
+
   const needsComponentValidation = node.type === 'INSTANCE' || node.type === 'FRAME' || node.type === 'COMPONENT_SET' || node.type === 'COMPONENT';
   if (needsComponentValidation) {
     await validateComponent(node, results, snapshot, nodeBreadcrumb);
@@ -84,7 +89,7 @@ export async function scanNode(
 
   if ('children' in node) {
     for (const child of node.children) {
-      await scanNode(child, results, snapshot, isComp, nodeBreadcrumb, onProgress, counter);
+      await scanNode(child, results, snapshot, isComp, nodeBreadcrumb, onProgress, counter, migratorMap);
     }
   }
 }
