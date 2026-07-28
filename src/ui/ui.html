@@ -94,7 +94,7 @@
     </div>
   </div>
   <div class="page" id="page-migrator" style="position: relative; height: 100%;">
-    <div id="migrator-scroll" style="flex: 1; overflow-y: auto; padding-bottom: 72px; padding-top: 16px;">
+    <div id="migrator-scroll" style="flex: 1; overflow-y: auto; padding-bottom: 72px; padding-top: 16px; display: flex; flex-direction: column; gap: 16px;">
       <!-- Title & Subtitle -->
       <div class="header-info">
         <div class="title">Миграция и проверка токенов</div>
@@ -104,7 +104,7 @@
       <div class="divider"></div>
 
       <!-- Scan Buttons -->
-      <div class="buttons-row" style="margin-bottom: 16px;">
+      <div class="buttons-row">
         <button class="btn-new-task" id="btnScanSelection">
           <div class="cta-inner-border"></div>
           <span>Скан выделенного</span>
@@ -118,7 +118,7 @@
       <div class="divider"></div>
 
       <!-- Stats area -->
-      <div id="migrator-stats-area" class="hidden stats-info" style="margin-top: 16px; margin-bottom: 16px;">
+      <div id="migrator-stats-area" class="hidden stats-info">
         <div class="stats-time">
           <div class="icon-btn" style="width: 16px; height: 16px; display: flex;">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.2 5.59998L6.42698 10.4L4.79999 8.76379" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -130,11 +130,11 @@
           <div class="stat-item"><div class="dot-icon dot-warning"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg></div><span id="migrator-vars-count">0 переменных</span></div>
           <div class="stat-item"><div class="dot-icon dot-error"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg></div><span id="migrator-notfound-count">0 не найдено</span></div>
         </div>
-        <div class="divider" style="margin-top: 16px;"></div>
+        <div class="divider"></div>
       </div>
 
       <!-- Libraries Area -->
-      <div id="libraries-section" style="display: flex; flex-direction: column; gap: 8px; margin-top: 16px;">
+      <div id="libraries-section" style="display: flex; flex-direction: column; gap: 8px;">
         <div style="font-weight: 500; font-size: 12px; color: black; text-align: left;">Выберите нужную библиотеку для проверки или миграции</div>
         <div class="lib-tree-wrapper" style="border-radius: 6px; outline: 1px solid rgba(0,0,0,0.1); outline-offset: -1px; max-height: 224px; overflow-y: auto; overflow-x: hidden;">
           <div id="libList" style="display: flex; flex-direction: column;">
