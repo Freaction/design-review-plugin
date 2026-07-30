@@ -19,8 +19,7 @@
       <div class="title">Самопроверка макетов</div>
       <div class="subtitle">Вкладка нужна для сверки макетов с дизайн-системой.</div>
       <div id="snapshot-status">
-        <span class="status-text">Эталон не загружен — откройте UI-Kit и </span>
-        <span class="status-text status-link" id="go-to-scan-tab">отсканируйте его</span>
+        <span class="status-text">Проверяем эталон...</span>
       </div>
     </div>
 
@@ -82,14 +81,39 @@
   </div>
 
   <div class="page" id="page-scan">
+    <div class="header-info">
+      <div class="title">Эталон дизайн-системы</div>
+      <div class="subtitle">Пользователи обновляют эталон с GitHub. Скан UI-Kit нужен только админу для публикации новой версии.</div>
+      <div class="snapshot-badge-row">
+        <span id="snapshot-version-badge" class="snapshot-badge">Проверка...</span>
+      </div>
+    </div>
+
     <div class="scan-area">
-      <button class="btn-new-task" id="update-snapshot" style="width: auto;">
+      <button class="btn-new-task" id="download-snapshot">
         <div class="cta-inner-border"></div>
-        <span id="update-snapshot-text">Обнови эталон ДС</span>
+        <span id="download-snapshot-text">Обновить эталон с GitHub</span>
       </button>
       <div class="scan-area-text" id="scan-snapshot-status">
-        <span class="status-text" id="scan-status-text1">Эталон не загружен — откройте UI-Kit и </span>
-        <span class="status-text status-link" id="scan-status-text2" style="text-decoration: underline;">отсканируйте его</span>
+        <span class="status-text" id="scan-status-text1">Проверяем версию эталона...</span>
+        <span class="status-text status-link" id="scan-status-text2" style="display: none;"></span>
+      </div>
+    </div>
+
+    <div class="scan-area">
+      <div class="subtitle" style="margin-bottom: 8px;">Для админа: отсканируй UI-Kit и экспортируй JSON на GitHub</div>
+      <div class="buttons-row">
+        <button class="btn-secondary" id="update-snapshot">
+          <span id="update-snapshot-text">Отсканировать UI-Kit</span>
+        </button>
+        <button class="btn-secondary" id="export-snapshot">
+          <span>Экспорт для GitHub</span>
+        </button>
+      </div>
+      <div id="snapshot-scan-stats" class="snapshot-scan-stats hidden">
+        <div class="stats-time">
+          <span id="snapshot-scan-stats-text">—</span>
+        </div>
       </div>
     </div>
   </div>

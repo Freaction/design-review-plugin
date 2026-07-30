@@ -1,12 +1,15 @@
 {
   "name": "Design Review",
-  "id": "123456789",
+  "id": "1664630637638276448",
+  "documentAccess": "dynamic-page",
   "api": "1.0.0",
   "main": "dist/code.js",
   "ui": "dist/ui.html",
   "editorType": ["figma"],
   "networkAccess": {
-    "allowedDomains": ["none"]
+    "allowedDomains": [
+      "https://raw.githubusercontent.com"
+    ]
   },
   "permissions": ["teamlibrary"]
 }

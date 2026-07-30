@@ -13,6 +13,15 @@ import {
   setScanProgress,
   onScanResults,
 } from './self-check/results';
+import {
+  initSnapshotUi,
+  applyLocalMeta,
+  checkRemoteVersion,
+  onRemoteSaved,
+  downloadJson,
+  showScanProgress,
+  showScanStats,
+} from './self-check/snapshot-status';
 
 initScanButton();
 initMigrateButton();
@@ -21,6 +30,7 @@ initDetachButton();
 initTabs();
 initGroupSwitch();
 initSelfCheckResults();
+initSnapshotUi();
 
 parent.postMessage({ pluginMessage: { type: 'GET_LIBRARIES' } }, '*');
 
@@ -56,10 +66,6 @@ document.querySelectorAll('.tab-button').forEach(tab => {
   });
 });
 
-document.getElementById('go-to-scan-tab')?.addEventListener('click', () => {
-  document.querySelector('.tab-button[data-page="scan"]')?.dispatchEvent(new MouseEvent('click'));
-});
-
 let isExpanded = false;
 const sizeBtn = document.getElementById('toggle-size')!;
 const expandSVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.76502 1.60001H14.3995M14.3995 1.60001V6.23449M14.3995 1.60001L8.9926 7.00691M6.23483 14.4H1.60034M1.60034 14.4V9.76552M1.60034 14.4L7.00724 8.99311" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -83,8 +89,9 @@ document.getElementById('scan-page')!.onclick = () => {
 document.getElementById('update-snapshot')!.onclick = () => {
   const btn = document.getElementById('update-snapshot') as HTMLButtonElement;
   btn.disabled = true;
-  document.getElementById('update-snapshot-text')!.textContent = '⏳ Обновление...';
-  parent.postMessage({ pluginMessage: { type: 'update-snapshot' } }, '*');
+  document.getElementById('update-snapshot-text')!.textContent = '⏳ Сканирование...';
+  const version = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+  parent.postMessage({ pluginMessage: { type: 'update-snapshot', version } }, '*');
 };
 
 window.onmessage = async (event) => {
@@ -99,43 +106,68 @@ window.onmessage = async (event) => {
   handleMigratorMessage(pluginMessage);
 
   if (pluginMessage.type === 'snapshot-progress') {
+    showScanProgress(pluginMessage);
+  }
+
+  if (pluginMessage.type === 'snapshot-info') {
+    if (pluginMessage.hasLocal) {
+      applyLocalMeta(pluginMessage);
+    } else {
+      applyLocalMeta(null);
+    }
+    checkRemoteVersion();
+  }
+
+  if (pluginMessage.type === 'snapshot-saved') {
+    const btn = document.getElementById('update-snapshot') as HTMLButtonElement;
+    if (btn) {
+      btn.disabled = false;
+      document.getElementById('update-snapshot-text')!.textContent = 'Отсканировать UI-Kit';
+    }
+    applyLocalMeta(pluginMessage);
+    showScanStats(pluginMessage);
+    checkRemoteVersion();
+  }
+
+  if (pluginMessage.type === 'snapshot-scan-error') {
+    const btn = document.getElementById('update-snapshot') as HTMLButtonElement;
+    if (btn) {
+      btn.disabled = false;
+      document.getElementById('update-snapshot-text')!.textContent = 'Отсканировать UI-Kit';
+    }
     const text1 = document.getElementById('scan-status-text1');
     const text2 = document.getElementById('scan-status-text2');
     if (text1) {
-      text1.textContent = `⏳ Обновление эталона... стр. «${pluginMessage.page}», обработано: ${pluginMessage.processed}`;
-      text1.style.color = 'var(--color-black-60)';
+      text1.textContent = pluginMessage.message || 'Ошибка скана UI-Kit';
+      text1.className = 'status-text status-error';
     }
     if (text2) text2.style.display = 'none';
   }
 
-  if (pluginMessage.type === 'snapshot-saved' || pluginMessage.type === 'snapshot-info') {
-    const text1 = document.getElementById('scan-status-text1');
-    const text2 = document.getElementById('scan-status-text2');
-    const btn = document.getElementById('update-snapshot') as HTMLButtonElement;
-    if (btn) {
-      btn.disabled = false;
-      document.getElementById('update-snapshot-text')!.textContent = 'Обнови эталон ДС';
-    }
-    if (text1) {
-      const date = new Date(pluginMessage.updatedAt).toLocaleString('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        year: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      text1.textContent = `✅ Эталон: ${pluginMessage.count} компонентов из "${pluginMessage.fileKey}" (${date})`;
-      text1.style.color = 'var(--color-black-80)';
-    }
-    if (text2) text2.style.display = 'none';
+  if (pluginMessage.type === 'snapshot-remote-saved') {
+    onRemoteSaved(pluginMessage);
+  }
 
-    const statusText1 = document.querySelector('#snapshot-status .status-text:nth-child(1)');
-    const statusText2 = document.querySelector('#snapshot-status .status-text:nth-child(2)');
-    if (statusText1) {
-      statusText1.textContent = `✅ Эталон: загружен. `;
-      (statusText1 as HTMLElement).style.color = '#4caf50';
+  if (pluginMessage.type === 'snapshot-remote-error') {
+    const btn = document.getElementById('download-snapshot') as HTMLButtonElement;
+    const label = document.getElementById('download-snapshot-text');
+    if (btn) btn.disabled = false;
+    if (label) label.textContent = 'Обновить эталон с GitHub';
+    const text1 = document.getElementById('scan-status-text1');
+    if (text1) {
+      text1.textContent = pluginMessage.message || 'Ошибка сохранения эталона';
+      text1.className = 'status-text status-error';
     }
-    if (statusText2) (statusText2 as HTMLElement).style.display = 'none';
+  }
+
+  if (pluginMessage.type === 'snapshot-export') {
+    downloadJson('meta.json', pluginMessage.meta);
+    downloadJson('snapshot.json', {
+      version: pluginMessage.meta.version,
+      u: pluginMessage.storage.u,
+      f: pluginMessage.storage.f,
+      c: pluginMessage.storage.c,
+    });
   }
 
   if (pluginMessage.type === 'scan-start') {

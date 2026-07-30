@@ -1,5 +1,6 @@
 import { scanNode, resetNodesScannedCount } from './scanner';
-import { saveSnapshot, loadSnapshot, loadSnapshotMeta } from './snapshot';
+import { loadSnapshot, loadSnapshotMeta } from './snapshot';
+import { handleSnapshotMessage } from './snapshot-messages';
 import { SCAN_NODE_TYPES } from './scan-config';
 import { processMigratorResults, scanData } from './migrator/scanHandler';
 import { onGetLibraries } from './migrator/libraries';
@@ -13,14 +14,15 @@ figma.showUI(__html__, { width: 450, height: 600, themeColors: true });
 
 (async () => {
   const meta = await loadSnapshotMeta();
-  if (meta) {
-    figma.ui.postMessage({
-      type: 'snapshot-info',
-      updatedAt: meta.updatedAt,
-      fileKey: meta.fileKey,
-      count: meta.count
-    });
-  }
+  figma.ui.postMessage({
+    type: 'snapshot-info',
+    updatedAt: meta?.updatedAt,
+    fileKey: meta?.fileKey,
+    count: meta?.count || 0,
+    version: meta?.version,
+    source: meta?.source,
+    hasLocal: !!meta,
+  });
 
   const theme = await figma.clientStorage.getAsync('theme');
   if (theme) {
@@ -30,7 +32,7 @@ figma.showUI(__html__, { width: 450, height: 600, themeColors: true });
 
 async function runGlobalScan(type: string, roots: readonly SceneNode[]) {
   if (roots.length === 0) {
-    figma.notify("Ничего не найдено для сканирования");
+    figma.notify('Ничего не найдено для сканирования');
     return;
   }
 
@@ -40,19 +42,10 @@ async function runGlobalScan(type: string, roots: readonly SceneNode[]) {
   figma.skipInvisibleInstanceChildren = true;
 
   let totalNodesToScan = 0;
-  if (type === 'scan-selection') {
-    for (const root of roots) {
-      totalNodesToScan++;
-      if ('findAllWithCriteria' in root) {
-        totalNodesToScan += (root as any).findAllWithCriteria({ types: SCAN_NODE_TYPES }).length;
-      }
-    }
-  } else {
-    for (const root of roots) {
-      totalNodesToScan++;
-      if ('findAllWithCriteria' in root) {
-        totalNodesToScan += (root as any).findAllWithCriteria({ types: SCAN_NODE_TYPES }).length;
-      }
+  for (const root of roots) {
+    totalNodesToScan++;
+    if ('findAllWithCriteria' in root) {
+      totalNodesToScan += (root as any).findAllWithCriteria({ types: SCAN_NODE_TYPES }).length;
     }
   }
 
@@ -63,7 +56,7 @@ async function runGlobalScan(type: string, roots: readonly SceneNode[]) {
   const results = {
     components: [] as any[],
     variables: [] as any[],
-    gradients: [] as any[]
+    gradients: [] as any[],
   };
 
   resetNodesScannedCount();
@@ -73,7 +66,14 @@ async function runGlobalScan(type: string, roots: readonly SceneNode[]) {
   const snapshot = snapshotArr ? new Map(snapshotArr.map((s: any) => [s.k, s])) : null;
 
   if (snapshot) {
-    figma.ui.postMessage({ type: 'snapshot-info', updatedAt: snapshotData!.u, fileKey: snapshotData!.f, count: snapshot.size });
+    figma.ui.postMessage({
+      type: 'snapshot-info',
+      updatedAt: snapshotData!.u,
+      fileKey: snapshotData!.f,
+      count: snapshot.size,
+      version: snapshotData!.version,
+      hasLocal: true,
+    });
   }
 
   console.log(`[Design Review] Начинаю проверку узлов...`);
@@ -105,7 +105,6 @@ figma.ui.onmessage = async (msg) => {
     const roots = msg.type === 'scan-selection'
       ? figma.currentPage.selection
       : figma.currentPage.children;
-
     await runGlobalScan(msg.type, roots as SceneNode[]);
   }
 
@@ -127,15 +126,10 @@ figma.ui.onmessage = async (msg) => {
   }
 
   if (msg.type === 'resize') {
-    const newHeight = msg.expanded ? 2000 : 600;
-    figma.ui.resize(450, newHeight);
+    figma.ui.resize(450, msg.expanded ? 2000 : 600);
   }
 
-  if (msg.type === 'update-snapshot') {
-    const { count, fileKey } = await saveSnapshot();
-    figma.notify(`✅ Эталон обновлён: ${count} компонентов из "${fileKey}"`);
-    figma.ui.postMessage({ type: 'snapshot-saved', count, fileKey, updatedAt: new Date().toISOString() });
-  }
+  if (await handleSnapshotMessage(msg)) return;
 
   if (msg.type === 'save-theme') {
     await figma.clientStorage.setAsync('theme', msg.theme);
@@ -154,7 +148,6 @@ figma.ui.onmessage = async (msg) => {
     } else if (msg.type === 'SCAN') {
       const scope = msg.scope as string;
       const scanType = scope === 'selection' ? 'scan-selection' : 'scan-page';
-
       let roots: SceneNode[] = [];
       if (scope === 'selection') {
         roots = figma.currentPage.selection as SceneNode[];
@@ -166,7 +159,6 @@ figma.ui.onmessage = async (msg) => {
       } else {
         roots = figma.currentPage.children as SceneNode[];
       }
-
       await runGlobalScan(scanType, roots);
     }
   } catch (err) {

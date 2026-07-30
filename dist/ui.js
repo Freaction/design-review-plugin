@@ -780,12 +780,258 @@
     }
   });
 
+  // src/ui/shared/snapshot-remote-config.js
+  var SNAPSHOT_REMOTE;
+  var init_snapshot_remote_config = __esm({
+    "src/ui/shared/snapshot-remote-config.js"() {
+      "use strict";
+      SNAPSHOT_REMOTE = {
+        metaUrl: "https://raw.githubusercontent.com/Freaction/design-review-plugin/main/ds-snapshot/meta.json",
+        snapshotUrl: "https://raw.githubusercontent.com/Freaction/design-review-plugin/main/ds-snapshot/snapshot.json"
+      };
+    }
+  });
+
+  // src/ui/shared/snapshot-remote.js
+  function fetchRemoteMeta() {
+    return __async(this, null, function* () {
+      const res = yield fetch(SNAPSHOT_REMOTE.metaUrl, { cache: "no-store" });
+      if (!res.ok) throw new Error(`\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C \u044D\u0442\u0430\u043B\u043E\u043D (${res.status})`);
+      return res.json();
+    });
+  }
+  function fetchRemoteSnapshot() {
+    return __async(this, null, function* () {
+      const res = yield fetch(SNAPSHOT_REMOTE.snapshotUrl, { cache: "no-store" });
+      if (!res.ok) throw new Error(`\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043A\u0430\u0447\u0430\u0442\u044C \u044D\u0442\u0430\u043B\u043E\u043D (${res.status})`);
+      const data = yield res.json();
+      if (!data || !Array.isArray(data.c)) throw new Error("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 \u0444\u043E\u0440\u043C\u0430\u0442 snapshot.json");
+      return data;
+    });
+  }
+  function compareVersions(localVersion, remoteVersion) {
+    if (!remoteVersion) return "unknown";
+    if (!localVersion) return "outdated";
+    if (localVersion === remoteVersion) return "current";
+    return "outdated";
+  }
+  var init_snapshot_remote = __esm({
+    "src/ui/shared/snapshot-remote.js"() {
+      "use strict";
+      init_snapshot_remote_config();
+    }
+  });
+
+  // src/ui/self-check/snapshot-scan-stats.ts
+  function formatElapsed(ms) {
+    const totalSec = Math.max(0, Math.floor((ms || 0) / 1e3));
+    const minutes = Math.floor(totalSec / 60);
+    const seconds = totalSec % 60;
+    if (minutes > 0) return `${minutes}\u043C ${seconds}\u0441`;
+    return `${seconds}\u0441`;
+  }
+  function showScanProgress(msg) {
+    const stats = document.getElementById("snapshot-scan-stats");
+    const statsText = document.getElementById("snapshot-scan-stats-text");
+    const text1 = document.getElementById("scan-status-text1");
+    const text2 = document.getElementById("scan-status-text2");
+    const elapsed = formatElapsed(msg.elapsedMs);
+    const pagesPart = msg.pagesTotal ? `\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430 ${msg.pageIndex || 0}/${msg.pagesTotal}` : `\u0441\u0442\u0440. \xAB${msg.page}\xBB`;
+    if (text1) {
+      text1.textContent = `\u23F3 \u0421\u043A\u0430\u043D UI-Kit... ${pagesPart}, \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432: ${msg.processed || 0}, ${elapsed}`;
+      text1.className = "status-text status-warn";
+    }
+    if (text2) text2.style.display = "none";
+    if (stats) stats.classList.remove("hidden");
+    if (statsText) {
+      statsText.textContent = `\u0412 \u043F\u0440\u043E\u0446\u0435\u0441\u0441\u0435: ${pagesPart} \xB7 ${msg.processed || 0} \u043A\u043E\u043C\u043F. \xB7 ${elapsed}`;
+    }
+  }
+  function showScanStats(meta) {
+    const stats = document.getElementById("snapshot-scan-stats");
+    const statsText = document.getElementById("snapshot-scan-stats-text");
+    if (!stats || !statsText) return;
+    stats.classList.remove("hidden");
+    const pages = meta.pagesTotal != null ? `${meta.pagesScanned || 0}/${meta.pagesTotal} \u0441\u0442\u0440.` : "\u2014";
+    statsText.textContent = `\u0413\u043E\u0442\u043E\u0432\u043E: ${meta.count || 0} \u043A\u043E\u043C\u043F. \xB7 ${pages} \xB7 ${formatElapsed(meta.elapsedMs)}`;
+  }
+  var init_snapshot_scan_stats = __esm({
+    "src/ui/self-check/snapshot-scan-stats.ts"() {
+      "use strict";
+    }
+  });
+
+  // src/ui/self-check/snapshot-status.ts
+  function formatDate(iso) {
+    if (!iso) return "\u2014";
+    return new Date(iso).toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+  function setMainStatus(text, tone) {
+    const el = document.getElementById("snapshot-status");
+    if (!el) return;
+    el.innerHTML = `<span class="status-text status-${tone}">${text}</span>`;
+  }
+  function setScanStatus(text1, text2, tone) {
+    const t1 = document.getElementById("scan-status-text1");
+    const t2 = document.getElementById("scan-status-text2");
+    if (!t1) return;
+    t1.textContent = text1;
+    t1.className = `status-text status-${tone}`;
+    if (t2) {
+      if (text2) {
+        t2.textContent = text2;
+        t2.style.display = "";
+        t2.className = "status-text status-link";
+      } else {
+        t2.style.display = "none";
+      }
+    }
+  }
+  function setUpdateBtnState() {
+    const updateBtn = document.getElementById("download-snapshot");
+    if (updateBtn) updateBtn.disabled = status === "current";
+  }
+  function renderStatus() {
+    const badge = document.getElementById("snapshot-version-badge");
+    const localVersion = (localMeta == null ? void 0 : localMeta.version) || "";
+    const remoteVersion = (remoteMeta == null ? void 0 : remoteMeta.version) || "";
+    if (status === "current") {
+      const label = `\u2705 \u042D\u0442\u0430\u043B\u043E\u043D \u0430\u043A\u0442\u0443\u0430\u043B\u0435\u043D \xB7 v${localVersion || "\u2014"} \xB7 ${(localMeta == null ? void 0 : localMeta.count) || 0} \u043A\u043E\u043C\u043F. \xB7 ${formatDate(localMeta == null ? void 0 : localMeta.updatedAt)}`;
+      setMainStatus(label, "ok");
+      setScanStatus(label, "", "ok");
+      if (badge) {
+        badge.textContent = "\u0410\u043A\u0442\u0443\u0430\u043B\u0435\u043D";
+        badge.className = "snapshot-badge snapshot-badge-ok";
+      }
+      setUpdateBtnState();
+      return;
+    }
+    if (status === "outdated") {
+      const label = localMeta ? `\u26A0\uFE0F \u042D\u0442\u0430\u043B\u043E\u043D \u0443\u0441\u0442\u0430\u0440\u0435\u043B \xB7 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E v${localVersion || "\u2014"}, \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435 v${remoteVersion}` : `\u26A0\uFE0F \u042D\u0442\u0430\u043B\u043E\u043D \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \xB7 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435 v${remoteVersion}`;
+      setMainStatus(label, "warn");
+      setScanStatus(label, "\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u044D\u0442\u0430\u043B\u043E\u043D \u0441 GitHub\xBB", "warn");
+      if (badge) {
+        badge.textContent = localMeta ? "\u0423\u0441\u0442\u0430\u0440\u0435\u043B" : "\u041D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D";
+        badge.className = "snapshot-badge snapshot-badge-warn";
+      }
+      setUpdateBtnState();
+      return;
+    }
+    if (localMeta) {
+      const label = `\u2705 \u042D\u0442\u0430\u043B\u043E\u043D \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \xB7 v${localVersion || "\u2014"} \xB7 ${localMeta.count} \u043A\u043E\u043C\u043F. \xB7 ${formatDate(localMeta.updatedAt)}`;
+      const hint = remoteCheckError ? "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C \u0441\u0435\u0440\u0432\u0435\u0440 \u2014 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u0432\u0441\u0451 \u0440\u0430\u0432\u043D\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E" : "";
+      setMainStatus(label, "ok");
+      setScanStatus(label, hint, "ok");
+      if (badge) {
+        badge.textContent = remoteMeta ? "\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0439" : "\u041D\u0435 \u043F\u0440\u043E\u0432\u0435\u0440\u0435\u043D";
+        badge.className = "snapshot-badge";
+      }
+      setUpdateBtnState();
+      return;
+    }
+    setMainStatus("\u042D\u0442\u0430\u043B\u043E\u043D \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \u2014 \u043E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441 GitHub", "error");
+    setScanStatus("\u042D\u0442\u0430\u043B\u043E\u043D \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \u2014 ", "\u043E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441 GitHub", "error");
+    if (badge) {
+      badge.textContent = "\u041D\u0435\u0442 \u044D\u0442\u0430\u043B\u043E\u043D\u0430";
+      badge.className = "snapshot-badge snapshot-badge-error";
+    }
+    setUpdateBtnState();
+  }
+  function applyLocalMeta(meta) {
+    localMeta = meta ? {
+      updatedAt: meta.updatedAt,
+      fileKey: meta.fileKey,
+      count: meta.count,
+      version: meta.version,
+      source: meta.source
+    } : null;
+    status = compareVersions(localMeta == null ? void 0 : localMeta.version, remoteMeta == null ? void 0 : remoteMeta.version);
+    renderStatus();
+  }
+  function checkRemoteVersion() {
+    return __async(this, null, function* () {
+      remoteCheckError = "";
+      try {
+        remoteMeta = yield fetchRemoteMeta();
+        status = compareVersions(localMeta == null ? void 0 : localMeta.version, remoteMeta == null ? void 0 : remoteMeta.version);
+      } catch (err) {
+        remoteMeta = null;
+        remoteCheckError = err instanceof Error ? err.message : String(err);
+        status = localMeta ? "unknown" : "outdated";
+      }
+      renderStatus();
+      return { remoteMeta, status };
+    });
+  }
+  function downloadAndSaveRemote() {
+    return __async(this, null, function* () {
+      const btn = document.getElementById("download-snapshot");
+      const label = document.getElementById("download-snapshot-text");
+      if (btn) btn.disabled = true;
+      if (label) label.textContent = "\u23F3 \u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435...";
+      try {
+        const storage = yield fetchRemoteSnapshot();
+        parent.postMessage({ pluginMessage: { type: "save-remote-snapshot", storage } }, "*");
+      } catch (err) {
+        if (label) label.textContent = "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u044D\u0442\u0430\u043B\u043E\u043D \u0441 GitHub";
+        if (btn) btn.disabled = status !== "current";
+        setScanStatus(err instanceof Error ? err.message : String(err), "", "error");
+        setMainStatus(err instanceof Error ? err.message : String(err), "error");
+      }
+    });
+  }
+  function onRemoteSaved(meta) {
+    applyLocalMeta(meta);
+    remoteCheckError = "";
+    const btn = document.getElementById("download-snapshot");
+    const label = document.getElementById("download-snapshot-text");
+    if (btn) btn.disabled = status === "current";
+    if (label) label.textContent = "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u044D\u0442\u0430\u043B\u043E\u043D \u0441 GitHub";
+  }
+  function downloadJson(filename, data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  function initSnapshotUi() {
+    var _a, _b;
+    (_a = document.getElementById("download-snapshot")) == null ? void 0 : _a.addEventListener("click", () => {
+      downloadAndSaveRemote();
+    });
+    (_b = document.getElementById("export-snapshot")) == null ? void 0 : _b.addEventListener("click", () => {
+      parent.postMessage({ pluginMessage: { type: "export-snapshot" } }, "*");
+    });
+  }
+  var localMeta, remoteMeta, status, remoteCheckError;
+  var init_snapshot_status = __esm({
+    "src/ui/self-check/snapshot-status.ts"() {
+      "use strict";
+      init_snapshot_remote();
+      init_snapshot_scan_stats();
+      localMeta = null;
+      remoteMeta = null;
+      status = "unknown";
+      remoteCheckError = "";
+    }
+  });
+
   // src/ui/ui.ts
   var require_ui = __commonJS({
     "src/ui/ui.ts"(exports) {
       init_handlers();
       init_results_ui();
       init_results();
+      init_snapshot_status();
       initScanButton();
       initMigrateButton();
       initCopyButton();
@@ -793,6 +1039,7 @@
       initTabs();
       initGroupSwitch();
       initSelfCheckResults();
+      initSnapshotUi();
       parent.postMessage({ pluginMessage: { type: "GET_LIBRARIES" } }, "*");
       var themeBtn = document.getElementById("toggle-theme");
       var sunSVG = '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 2V3M8 13V14M2 8H3M13 8H14M3.76 3.76L4.47 4.47M11.53 11.53L12.24 12.24M12.24 3.76L11.53 4.47M4.47 11.53L3.76 12.24" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>';
@@ -822,20 +1069,15 @@
           document.getElementById(targetId).classList.add("active");
         });
       });
-      var _a2;
-      (_a2 = document.getElementById("go-to-scan-tab")) == null ? void 0 : _a2.addEventListener("click", () => {
-        var _a3;
-        (_a3 = document.querySelector('.tab-button[data-page="scan"]')) == null ? void 0 : _a3.dispatchEvent(new MouseEvent("click"));
-      });
       var isExpanded = false;
       var sizeBtn = document.getElementById("toggle-size");
       var expandSVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.76502 1.60001H14.3995M14.3995 1.60001V6.23449M14.3995 1.60001L8.9926 7.00691M6.23483 14.4H1.60034M1.60034 14.4V9.76552M1.60034 14.4L7.00724 8.99311" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       var collapseSVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.00724 13.6275L7.00724 8.99304L2.37276 8.99304M7.00724 8.99304L1.60034 14.3999M8.99253 2.37248V7.00697L13.627 7.00697M8.99253 7.00697L14.3994 1.60007" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       sizeBtn.onclick = () => {
-        var _a3;
+        var _a2;
         isExpanded = !isExpanded;
         sizeBtn.innerHTML = isExpanded ? collapseSVG : expandSVG;
-        (_a3 = document.getElementById("page-migrator")) == null ? void 0 : _a3.classList.toggle("expanded", isExpanded);
+        (_a2 = document.getElementById("page-migrator")) == null ? void 0 : _a2.classList.toggle("expanded", isExpanded);
         parent.postMessage({ pluginMessage: { type: "resize", expanded: isExpanded } }, "*");
       };
       document.getElementById("scan-selection").onclick = () => {
@@ -847,8 +1089,9 @@
       document.getElementById("update-snapshot").onclick = () => {
         const btn = document.getElementById("update-snapshot");
         btn.disabled = true;
-        document.getElementById("update-snapshot-text").textContent = "\u23F3 \u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435...";
-        parent.postMessage({ pluginMessage: { type: "update-snapshot" } }, "*");
+        document.getElementById("update-snapshot-text").textContent = "\u23F3 \u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435...";
+        const version = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10).replace(/-/g, ".");
+        parent.postMessage({ pluginMessage: { type: "update-snapshot", version } }, "*");
       };
       window.onmessage = (event) => __async(null, null, function* () {
         const pluginMessage = event.data.pluginMessage;
@@ -859,41 +1102,62 @@
         }
         handleMigratorMessage(pluginMessage);
         if (pluginMessage.type === "snapshot-progress") {
-          const text1 = document.getElementById("scan-status-text1");
-          const text2 = document.getElementById("scan-status-text2");
-          if (text1) {
-            text1.textContent = `\u23F3 \u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u044D\u0442\u0430\u043B\u043E\u043D\u0430... \u0441\u0442\u0440. \xAB${pluginMessage.page}\xBB, \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u0430\u043D\u043E: ${pluginMessage.processed}`;
-            text1.style.color = "var(--color-black-60)";
-          }
-          if (text2) text2.style.display = "none";
+          showScanProgress(pluginMessage);
         }
-        if (pluginMessage.type === "snapshot-saved" || pluginMessage.type === "snapshot-info") {
-          const text1 = document.getElementById("scan-status-text1");
-          const text2 = document.getElementById("scan-status-text2");
+        if (pluginMessage.type === "snapshot-info") {
+          if (pluginMessage.hasLocal) {
+            applyLocalMeta(pluginMessage);
+          } else {
+            applyLocalMeta(null);
+          }
+          checkRemoteVersion();
+        }
+        if (pluginMessage.type === "snapshot-saved") {
           const btn = document.getElementById("update-snapshot");
           if (btn) {
             btn.disabled = false;
-            document.getElementById("update-snapshot-text").textContent = "\u041E\u0431\u043D\u043E\u0432\u0438 \u044D\u0442\u0430\u043B\u043E\u043D \u0414\u0421";
+            document.getElementById("update-snapshot-text").textContent = "\u041E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u0442\u044C UI-Kit";
           }
+          applyLocalMeta(pluginMessage);
+          showScanStats(pluginMessage);
+          checkRemoteVersion();
+        }
+        if (pluginMessage.type === "snapshot-scan-error") {
+          const btn = document.getElementById("update-snapshot");
+          if (btn) {
+            btn.disabled = false;
+            document.getElementById("update-snapshot-text").textContent = "\u041E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u0442\u044C UI-Kit";
+          }
+          const text1 = document.getElementById("scan-status-text1");
+          const text2 = document.getElementById("scan-status-text2");
           if (text1) {
-            const date = new Date(pluginMessage.updatedAt).toLocaleString("ru-RU", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit"
-            });
-            text1.textContent = `\u2705 \u042D\u0442\u0430\u043B\u043E\u043D: ${pluginMessage.count} \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432 \u0438\u0437 "${pluginMessage.fileKey}" (${date})`;
-            text1.style.color = "var(--color-black-80)";
+            text1.textContent = pluginMessage.message || "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u043A\u0430\u043D\u0430 UI-Kit";
+            text1.className = "status-text status-error";
           }
           if (text2) text2.style.display = "none";
-          const statusText1 = document.querySelector("#snapshot-status .status-text:nth-child(1)");
-          const statusText2 = document.querySelector("#snapshot-status .status-text:nth-child(2)");
-          if (statusText1) {
-            statusText1.textContent = `\u2705 \u042D\u0442\u0430\u043B\u043E\u043D: \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D. `;
-            statusText1.style.color = "#4caf50";
+        }
+        if (pluginMessage.type === "snapshot-remote-saved") {
+          onRemoteSaved(pluginMessage);
+        }
+        if (pluginMessage.type === "snapshot-remote-error") {
+          const btn = document.getElementById("download-snapshot");
+          const label = document.getElementById("download-snapshot-text");
+          if (btn) btn.disabled = false;
+          if (label) label.textContent = "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u044D\u0442\u0430\u043B\u043E\u043D \u0441 GitHub";
+          const text1 = document.getElementById("scan-status-text1");
+          if (text1) {
+            text1.textContent = pluginMessage.message || "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u044D\u0442\u0430\u043B\u043E\u043D\u0430";
+            text1.className = "status-text status-error";
           }
-          if (statusText2) statusText2.style.display = "none";
+        }
+        if (pluginMessage.type === "snapshot-export") {
+          downloadJson("meta.json", pluginMessage.meta);
+          downloadJson("snapshot.json", {
+            version: pluginMessage.meta.version,
+            u: pluginMessage.storage.u,
+            f: pluginMessage.storage.f,
+            c: pluginMessage.storage.c
+          });
         }
         if (pluginMessage.type === "scan-start") {
           setScanStart(pluginMessage.total);

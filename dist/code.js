@@ -1314,7 +1314,7 @@
   });
 
   // src/plugin/snapshot.ts
-  function buildLayerTree(node, rootId, layers) {
+  function buildLayerTree(node, layers) {
     return __async(this, null, function* () {
       const parts = [];
       const fills = yield extractFills(node);
@@ -1334,61 +1334,121 @@
       }
       if ("children" in node) {
         for (const child of node.children) {
-          yield buildLayerTree(child, rootId, layers);
+          yield buildLayerTree(child, layers);
         }
       }
     });
   }
-  function saveSnapshot() {
+  function buildMeta(storage, source) {
+    return {
+      updatedAt: storage.u,
+      fileKey: storage.f,
+      count: storage.c.length,
+      version: storage.version,
+      source
+    };
+  }
+  function persist(storage, source) {
+    return __async(this, null, function* () {
+      const meta = buildMeta(storage, source);
+      yield figma.clientStorage.setAsync(STORAGE_KEY, storage);
+      yield figma.clientStorage.setAsync(STORAGE_KEY_META, meta);
+      return meta;
+    });
+  }
+  function collectPageComponents(page) {
+    return __async(this, null, function* () {
+      yield page.loadAsync();
+      return page.findAllWithCriteria({ types: ["COMPONENT"] });
+    });
+  }
+  function saveSnapshot(version) {
     return __async(this, null, function* () {
       var _a;
+      const t0 = Date.now();
+      figma.ui.postMessage({
+        type: "snapshot-progress",
+        page: "\u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446",
+        pageIndex: 0,
+        pagesTotal: 0,
+        pagesScanned: 0,
+        processed: 0,
+        elapsedMs: 0
+      });
+      yield figma.loadAllPagesAsync();
       const components = [];
-      const BATCH_SIZE = 100;
-      for (const page of figma.root.children) {
+      const BATCH_SIZE = 50;
+      const pages = figma.root.children;
+      const pagesTotal = pages.length;
+      let pagesScanned = 0;
+      for (let p = 0; p < pages.length; p++) {
+        const page = pages[p];
+        figma.ui.postMessage({
+          type: "snapshot-progress",
+          page: page.name,
+          pageIndex: p + 1,
+          pagesTotal,
+          pagesScanned,
+          processed: components.length,
+          elapsedMs: Date.now() - t0
+        });
         let nodes;
         try {
-          nodes = page.findAllWithCriteria({ types: ["COMPONENT"] });
-        } catch (e) {
+          nodes = yield collectPageComponents(page);
+        } catch (err) {
+          console.warn(`[DS Snapshot] \u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \xAB${page.name}\xBB \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u0430:`, err);
           continue;
         }
+        pagesScanned++;
         for (let i = 0; i < nodes.length; i++) {
           const node = nodes[i];
+          if (!node.key) continue;
           const parentName = ((_a = node.parent) == null ? void 0 : _a.type) === "COMPONENT_SET" ? node.parent.name : void 0;
           const layers = {};
-          yield buildLayerTree(node, node.id, layers);
+          yield buildLayerTree(node, layers);
           components.push({ k: node.key, n: node.name, p: parentName, l: layers });
           if ((i + 1) % BATCH_SIZE === 0) {
             figma.ui.postMessage({
               type: "snapshot-progress",
               page: page.name,
-              processed: components.length
+              pageIndex: p + 1,
+              pagesTotal,
+              pagesScanned,
+              processed: components.length,
+              elapsedMs: Date.now() - t0
             });
-            yield new Promise((resolve) => setTimeout(resolve, 50));
+            yield new Promise((resolve) => setTimeout(resolve, 0));
           }
         }
       }
+      if (components.length === 0) {
+        throw new Error("\u041A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u044B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B. \u041E\u0442\u043A\u0440\u043E\u0439 \u0444\u0430\u0439\u043B UI-Kit \u0438 \u043F\u043E\u0432\u0442\u043E\u0440\u0438 \u0441\u043A\u0430\u043D.");
+      }
+      const elapsedMs = Date.now() - t0;
       const storage = {
         c: components,
         u: (/* @__PURE__ */ new Date()).toISOString(),
-        f: figma.root.name
+        f: figma.root.name,
+        version: version || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10).replace(/-/g, ".")
       };
-      const meta = {
-        updatedAt: storage.u,
-        fileKey: storage.f,
-        count: components.length
+      console.log(`[DS Snapshot] \u041F\u043E\u043B\u043D\u0430\u044F \u0437\u0430\u043C\u0435\u043D\u0430 \u044D\u0442\u0430\u043B\u043E\u043D\u0430: ${components.length} \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432 \u0438\u0437 "${storage.f}"`);
+      const meta = yield persist(storage, "local");
+      return __spreadProps(__spreadValues({}, meta), { pagesScanned, pagesTotal, elapsedMs });
+    });
+  }
+  function saveRemoteSnapshot(storage) {
+    return __async(this, null, function* () {
+      if (!(storage == null ? void 0 : storage.c) || !Array.isArray(storage.c) || storage.c.length === 0) {
+        throw new Error("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 \u0438\u043B\u0438 \u043F\u0443\u0441\u0442\u043E\u0439 snapshot");
+      }
+      const normalized = {
+        c: storage.c,
+        u: storage.u || (/* @__PURE__ */ new Date()).toISOString(),
+        f: storage.f || "UI-Kit",
+        version: storage.version
       };
-      yield figma.clientStorage.setAsync(STORAGE_KEY, storage);
-      yield figma.clientStorage.setAsync(STORAGE_KEY_META, meta);
-      console.log(`[DS Snapshot] \u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E ${components.length} \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432 \u0438\u0437 "${figma.root.name}"`);
-      console.log("[DS Snapshot] \u041A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u044B:", JSON.stringify(
-        components.map((c) => ({
-          component: c.p ? `${c.p} / ${c.n}` : c.n,
-          key: c.k
-        })),
-        null,
-        2
-      ));
-      return { count: components.length, fileKey: figma.root.name };
+      console.log(`[DS Snapshot] \u041F\u043E\u043B\u043D\u0430\u044F \u0437\u0430\u043C\u0435\u043D\u0430 \u044D\u0442\u0430\u043B\u043E\u043D\u0430 \u0441 GitHub: ${normalized.c.length} \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432`);
+      return persist(normalized, "remote");
     });
   }
   function loadSnapshot() {
@@ -1416,6 +1476,63 @@
       init_extractors();
       STORAGE_KEY = "ds_component_snapshot";
       STORAGE_KEY_META = "ds_component_snapshot_meta";
+    }
+  });
+
+  // src/plugin/snapshot-messages.ts
+  function handleSnapshotMessage(msg) {
+    return __async(this, null, function* () {
+      if (msg.type === "update-snapshot") {
+        try {
+          const meta = yield saveSnapshot(msg.version);
+          figma.notify(`\u2705 \u042D\u0442\u0430\u043B\u043E\u043D \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D: ${meta.count} \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432 \u0438\u0437 "${meta.fileKey}"`);
+          figma.ui.postMessage(__spreadValues({ type: "snapshot-saved" }, meta));
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          figma.notify(`\u2715 ${message}`);
+          figma.ui.postMessage({ type: "snapshot-scan-error", message });
+        }
+        return true;
+      }
+      if (msg.type === "save-remote-snapshot") {
+        try {
+          const meta = yield saveRemoteSnapshot(msg.storage);
+          figma.notify(`\u2705 \u042D\u0442\u0430\u043B\u043E\u043D \u0441 GitHub: v${meta.version || "\u2014"} \xB7 ${meta.count} \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432`);
+          figma.ui.postMessage(__spreadValues({ type: "snapshot-remote-saved" }, meta));
+        } catch (err) {
+          figma.ui.postMessage({
+            type: "snapshot-remote-error",
+            message: err instanceof Error ? err.message : String(err)
+          });
+        }
+        return true;
+      }
+      if (msg.type === "export-snapshot") {
+        const storage = yield loadSnapshot();
+        const meta = yield loadSnapshotMeta();
+        if (!storage || !meta || !storage.c.length) {
+          figma.notify("\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u0443\u0439\u0442\u0435 UI-Kit");
+          return true;
+        }
+        figma.ui.postMessage({
+          type: "snapshot-export",
+          storage,
+          meta: {
+            version: meta.version || storage.version || storage.u.slice(0, 10).replace(/-/g, "."),
+            updatedAt: meta.updatedAt,
+            count: meta.count,
+            fileKey: meta.fileKey
+          }
+        });
+        return true;
+      }
+      return false;
+    });
+  }
+  var init_snapshot_messages = __esm({
+    "src/plugin/snapshot-messages.ts"() {
+      "use strict";
+      init_snapshot();
     }
   });
 
@@ -1773,6 +1890,7 @@
     "src/plugin/code.ts"(exports) {
       init_scanner();
       init_snapshot();
+      init_snapshot_messages();
       init_scan_config();
       init_scanHandler();
       init_libraries();
@@ -1783,14 +1901,15 @@
       figma.showUI(__html__, { width: 450, height: 600, themeColors: true });
       (() => __async(null, null, function* () {
         const meta = yield loadSnapshotMeta();
-        if (meta) {
-          figma.ui.postMessage({
-            type: "snapshot-info",
-            updatedAt: meta.updatedAt,
-            fileKey: meta.fileKey,
-            count: meta.count
-          });
-        }
+        figma.ui.postMessage({
+          type: "snapshot-info",
+          updatedAt: meta == null ? void 0 : meta.updatedAt,
+          fileKey: meta == null ? void 0 : meta.fileKey,
+          count: (meta == null ? void 0 : meta.count) || 0,
+          version: meta == null ? void 0 : meta.version,
+          source: meta == null ? void 0 : meta.source,
+          hasLocal: !!meta
+        });
         const theme = yield figma.clientStorage.getAsync("theme");
         if (theme) {
           figma.ui.postMessage({ type: "init-theme", theme });
@@ -1807,19 +1926,10 @@
           console.log(`[Design Review] \u0417\u0430\u043F\u0443\u0441\u043A \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u044F (${type})... \u0421\u043E\u0431\u0438\u0440\u0430\u0435\u043C \u0443\u0437\u043B\u044B...`);
           figma.skipInvisibleInstanceChildren = true;
           let totalNodesToScan = 0;
-          if (type === "scan-selection") {
-            for (const root of roots) {
-              totalNodesToScan++;
-              if ("findAllWithCriteria" in root) {
-                totalNodesToScan += root.findAllWithCriteria({ types: SCAN_NODE_TYPES }).length;
-              }
-            }
-          } else {
-            for (const root of roots) {
-              totalNodesToScan++;
-              if ("findAllWithCriteria" in root) {
-                totalNodesToScan += root.findAllWithCriteria({ types: SCAN_NODE_TYPES }).length;
-              }
+          for (const root of roots) {
+            totalNodesToScan++;
+            if ("findAllWithCriteria" in root) {
+              totalNodesToScan += root.findAllWithCriteria({ types: SCAN_NODE_TYPES }).length;
             }
           }
           console.log(`[Design Review] \u0423\u0437\u043B\u044B \u0441\u043E\u0431\u0440\u0430\u043D\u044B \u0437\u0430 ${Date.now() - t0}\u043C\u0441. \u0412\u0441\u0435\u0433\u043E \u0443\u0437\u043B\u043E\u0432: ${totalNodesToScan}`);
@@ -1834,7 +1944,14 @@
           const snapshotArr = (_a = snapshotData == null ? void 0 : snapshotData.c) != null ? _a : null;
           const snapshot = snapshotArr ? new Map(snapshotArr.map((s) => [s.k, s])) : null;
           if (snapshot) {
-            figma.ui.postMessage({ type: "snapshot-info", updatedAt: snapshotData.u, fileKey: snapshotData.f, count: snapshot.size });
+            figma.ui.postMessage({
+              type: "snapshot-info",
+              updatedAt: snapshotData.u,
+              fileKey: snapshotData.f,
+              count: snapshot.size,
+              version: snapshotData.version,
+              hasLocal: true
+            });
           }
           console.log(`[Design Review] \u041D\u0430\u0447\u0438\u043D\u0430\u044E \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0443 \u0443\u0437\u043B\u043E\u0432...`);
           const t1 = Date.now();
@@ -1875,14 +1992,9 @@
           }
         }
         if (msg.type === "resize") {
-          const newHeight = msg.expanded ? 2e3 : 600;
-          figma.ui.resize(450, newHeight);
+          figma.ui.resize(450, msg.expanded ? 2e3 : 600);
         }
-        if (msg.type === "update-snapshot") {
-          const { count, fileKey } = yield saveSnapshot();
-          figma.notify(`\u2705 \u042D\u0442\u0430\u043B\u043E\u043D \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D: ${count} \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432 \u0438\u0437 "${fileKey}"`);
-          figma.ui.postMessage({ type: "snapshot-saved", count, fileKey, updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
-        }
+        if (yield handleSnapshotMessage(msg)) return;
         if (msg.type === "save-theme") {
           yield figma.clientStorage.setAsync("theme", msg.theme);
         }
