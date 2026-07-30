@@ -36,10 +36,11 @@ export function hydrateSync(rawMap: Map<string, BindingLocation[]>): Map<string,
 export function processMigratorResults(rawMap: Map<string, BindingLocation[]>, totalNodes: number, tTotal: number): ScanResult {
   scanData = hydrateSync(rawMap);
   const variables: VariableUsageInfo[] = Array.from(scanData.values()).map(u => ({
-    variableId:    u.variableId,
-    variableName:  u.variableName,
+    variableId: u.variableId,
+    variableName: u.variableName,
     collectionName: u.collectionName,
     locationCount: u.locations.length,
+    locations: u.locations.map(l => ({ nodeId: l.nodeId, nodeName: l.nodeName })),
   }));
   return { variables, nodeCount: totalNodes };
 }

@@ -1,10 +1,16 @@
 export type Scope = 'selection' | 'page' | 'document';
 
+export interface VariableLocationInfo {
+  nodeId: string;
+  nodeName: string;
+}
+
 export interface VariableUsageInfo {
   variableId: string;
   variableName: string;
   collectionName: string;
   locationCount: number;
+  locations: VariableLocationInfo[];
 }
 
 export interface ScanResult {

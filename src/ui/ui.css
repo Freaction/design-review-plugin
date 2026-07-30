@@ -405,6 +405,8 @@ body {
 
 /* ── Variable list ── */
 .var-list { display: flex; flex-direction: column; gap: 3px; max-height: 180px; overflow-y: auto; }
+.page.expanded #migrator-scroll { min-height: 0; }
+.page.expanded .var-list { max-height: none; overflow-y: visible; }
 .var-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; background: var(--color-black-03); border: 1px solid var(--color-black-10); }
 .vName { font-size: 12px; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-black-100); }
 .vColl { font-size: 11px; color: var(--color-black-60); flex-shrink: 0; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -501,6 +503,80 @@ body {
   cursor: pointer;
 }
 .var-item-new:hover { background: rgba(0,0,0,0.06); }
+.var-item-row {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+}
+.var-item-dot {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.var-item-title {
+  color: var(--color-black-100);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  word-wrap: break-word;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.var-item-meta {
+  color: var(--color-black-40);
+  font-weight: 400;
+  margin-left: 4px;
+}
+.var-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.var-item-count {
+  color: var(--color-black-60);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.var-item-detach {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-black-80);
+  cursor: pointer;
+}
+.var-item-detach:hover {
+  background: rgba(245, 158, 11, 0.12);
+}
+.dark-theme .var-item-count {
+  color: var(--color-black-60);
+}
+.var-list-empty {
+  font-size: 12px;
+  color: var(--color-black-40);
+  text-align: center;
+  padding: 12px;
+}
+.dark-theme .var-item-new {
+  background: rgba(255, 255, 255, 0.04);
+  outline-color: rgba(255, 255, 255, 0.12);
+}
+.dark-theme .var-item-new:hover { background: rgba(255, 255, 255, 0.08); }
 
 /* ── Selected bar ── */
 .sel-bar { font-size: 11px; color: var(--color-black-60); padding: 4px 0; display: flex; align-items: center; justify-content: space-between; }

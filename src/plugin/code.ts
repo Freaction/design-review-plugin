@@ -7,6 +7,7 @@ import { onMigrate } from './migrator/migrate';
 import { onDetachNotFound } from './migrator/detach';
 import type { BindingLocation } from './migrator/types';
 import { send } from './migrator/utils';
+import { focusNodesByIds } from './focus-nodes';
 
 figma.showUI(__html__, { width: 450, height: 600, themeColors: true });
 
@@ -47,12 +48,11 @@ async function runGlobalScan(type: string, roots: readonly SceneNode[]) {
       }
     }
   } else {
-    // page or document
     for (const root of roots) {
-       totalNodesToScan++;
-       if ('findAllWithCriteria' in root) {
-         totalNodesToScan += (root as any).findAllWithCriteria({ types: SCAN_NODE_TYPES }).length;
-       }
+      totalNodesToScan++;
+      if ('findAllWithCriteria' in root) {
+        totalNodesToScan += (root as any).findAllWithCriteria({ types: SCAN_NODE_TYPES }).length;
+      }
     }
   }
 
@@ -110,10 +110,19 @@ figma.ui.onmessage = async (msg) => {
   }
 
   if (msg.type === 'focus-node') {
-    const node = await figma.getNodeByIdAsync(msg.nodeId) as SceneNode;
-    if (node) {
-      figma.currentPage.selection = [node];
-      figma.viewport.scrollAndZoomIntoView([node]);
+    await focusNodesByIds([msg.nodeId]);
+  }
+
+  if (msg.type === 'focus-nodes') {
+    await focusNodesByIds(msg.nodeIds || []);
+  }
+
+  if (msg.type === 'FOCUS_VARIABLE') {
+    if (scanData) {
+      const usage = Array.from(scanData.values()).find(u => u.variableName === msg.name);
+      if (usage?.locations.length) {
+        await focusNodesByIds(usage.locations.map(loc => loc.nodeId));
+      }
     }
   }
 
@@ -132,7 +141,6 @@ figma.ui.onmessage = async (msg) => {
     await figma.clientStorage.setAsync('theme', msg.theme);
   }
 
-  // Migrator backend handlers
   try {
     if (msg.type === 'GET_LIBRARIES') {
       await onGetLibraries();
@@ -146,12 +154,11 @@ figma.ui.onmessage = async (msg) => {
     } else if (msg.type === 'SCAN') {
       const scope = msg.scope as string;
       const scanType = scope === 'selection' ? 'scan-selection' : 'scan-page';
-      
+
       let roots: SceneNode[] = [];
       if (scope === 'selection') {
         roots = figma.currentPage.selection as SceneNode[];
       } else if (scope === 'document') {
-        // Document scan is heavy, we'll scan all pages
         roots = [];
         for (const page of figma.root.children) {
           roots.push(...(page.children as SceneNode[]));

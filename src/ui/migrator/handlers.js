@@ -84,6 +84,7 @@ function fallbackCopy(text, onDone) {
 export function initDetachButton() {
   $('btnDetach').addEventListener('click', () => {
     if (!state.currentNotFound.length) return;
+    state.detachTarget = '';
     setBtn('btnDetach', true, 'Отвязка…');
     post('DETACH_NOT_FOUND', { names: state.currentNotFound });
   });

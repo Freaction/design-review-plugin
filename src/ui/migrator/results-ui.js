@@ -1,8 +1,9 @@
 import { state } from './state.js';
-import { $, setBtn, msgList, toastOk, x } from './helpers.js';
+import { $, setBtn, msgList, toastOk } from './helpers.js';
+import { renderGroupedOrExpanded } from './var-rows.js';
 
 let lastScanResult = null;
-let currentTab = 'allvars'; 
+let currentTab = 'allvars';
 
 export function initTabs() {
   $('tab-notfound')?.addEventListener('click', () => {
@@ -15,6 +16,16 @@ export function initTabs() {
     updateTabs();
     renderVarList();
   });
+}
+
+export function initGroupSwitch() {
+  $('group-migrator-switch')?.addEventListener('change', () => {
+    renderVarList();
+  });
+}
+
+function isGrouped() {
+  return !!$('group-migrator-switch')?.checked;
 }
 
 function updateTabs() {
@@ -32,71 +43,88 @@ function updateTabs() {
 export function onScan(result) {
   setBtn('btnScanSelection', false);
   setBtn('btnScanPage', false);
-  
+
   lastScanResult = result;
-  
+
   $('migrator-stats-area').classList.remove('hidden');
   $('migrator-results-divider').classList.remove('hidden');
   $('panelResult').classList.remove('hidden');
-  
+
   $('migrator-nodes-count').textContent = result.nodeCount + ' нод';
   $('migrator-vars-count').textContent = result.variables.length + ' переменных';
-  
+
   $('migrator-notfound-count').textContent = '0 не найдено';
   $('tab-notfound-count').textContent = '0';
   $('tab-allvars-count').textContent = result.variables.length;
-  
+
   currentTab = 'allvars';
   state.currentNotFound = [];
   updateTabs();
   renderVarList();
 }
 
+function findVar(name) {
+  return lastScanResult?.variables?.find(v => v.variableName === name) || null;
+}
+
+function updateTabCounts(grouped) {
+  if (!lastScanResult) return;
+  if (grouped) {
+    $('tab-allvars-count').textContent = lastScanResult.variables.length;
+    $('tab-notfound-count').textContent = state.currentNotFound.length;
+    return;
+  }
+  $('tab-allvars-count').textContent = lastScanResult.variables.reduce(
+    (n, v) => n + (v.locations?.length || 1),
+    0
+  );
+  $('tab-notfound-count').textContent = state.currentNotFound.reduce((n, name) => {
+    const v = findVar(name);
+    return n + (v?.locations?.length || 1);
+  }, 0);
+}
+
 function renderVarList() {
   const list = $('varList');
   list.innerHTML = '';
-  
+  const grouped = isGrouped();
+  updateTabCounts(grouped);
+
   if (currentTab === 'notfound') {
     if (!state.currentNotFound.length) {
-      list.innerHTML = '<div style="font-size:12px;color:rgba(0,0,0,0.4);text-align:center;padding:12px;">Нет проблемных токенов</div>';
+      list.innerHTML = '<div class="var-list-empty">Нет проблемных токенов</div>';
       return;
     }
     for (const name of state.currentNotFound) {
-      const d = document.createElement('div');
-      d.className = 'var-item-new';
-      d.innerHTML = `
-        <div style="display:inline-flex; align-items:flex-start; gap:4px;">
-          <div style="width:16px; height:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-             <div style="width:6px; height:6px; background:#F59E0B; border-radius:1px;"></div>
-          </div>
-          <div style="color:black; font-size:12px; font-weight:500; line-height:16px; word-wrap:break-word;">${x(name)}</div>
-        </div>
-      `;
-      list.appendChild(d);
+      const v = findVar(name);
+      renderGroupedOrExpanded(list, {
+        color: '#F59E0B',
+        collectionName: v?.collectionName,
+        name,
+        locations: v?.locations || [],
+        grouped,
+        canDetach: true,
+      });
     }
-  } else {
-    if (!lastScanResult || !lastScanResult.variables.length) {
-      list.innerHTML = '<div style="font-size:12px;color:rgba(0,0,0,0.4);text-align:center;padding:12px;">Переменные не найдены</div>';
-      return;
-    }
-    for (const v of lastScanResult.variables) {
-      const isNotFound = state.currentNotFound.includes(v.variableName);
-      const color = isNotFound ? '#F59E0B' : '#0ADB29';
-      
-      const d = document.createElement('div');
-      d.className = 'var-item-new';
-      d.innerHTML = `
-        <div style="display:inline-flex; align-items:flex-start; gap:4px;">
-          <div style="width:16px; height:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-             <div style="width:6px; height:6px; background:${color}; border-radius:1px;"></div>
-          </div>
-          <div style="color:black; font-size:12px; font-weight:500; line-height:16px; word-wrap:break-word;">
-            ${x(v.variableName)} <span style="color:rgba(0,0,0,0.4);font-weight:400;margin-left:4px;">${v.locationCount}х</span>
-          </div>
-        </div>
-      `;
-      list.appendChild(d);
-    }
+    return;
+  }
+
+  if (!lastScanResult || !lastScanResult.variables.length) {
+    list.innerHTML = '<div class="var-list-empty">Переменные не найдены</div>';
+    return;
+  }
+
+  for (const v of lastScanResult.variables) {
+    const isNotFound = state.currentNotFound.includes(v.variableName);
+    renderGroupedOrExpanded(list, {
+      color: isNotFound ? '#F59E0B' : '#0ADB29',
+      collectionName: v.collectionName,
+      name: v.variableName,
+      locations: v.locations || [],
+      locationCount: v.locationCount,
+      grouped,
+      canDetach: isNotFound,
+    });
   }
 }
 
@@ -104,28 +132,25 @@ export function onMigrate(msg) {
   const result = msg.result;
   setBtn('btnMigrate', false);
   setBtn('btnCheckMigrate', false);
-  
+
   $('migrator-results-divider').classList.remove('hidden');
   $('panelResult').classList.remove('hidden');
 
   state.currentNotFound = result.notFound || [];
-  
+
   $('migrator-notfound-count').textContent = state.currentNotFound.length + ' не найдено';
   $('tab-notfound-count').textContent = state.currentNotFound.length;
-  
+
   currentTab = 'notfound';
   updateTabs();
   renderVarList();
-  
+
   if (result.errors.length) {
     $('errorMsgs').classList.remove('hidden');
     msgList('errorMsgs', result.errors, 'msg-r', '✕ ');
   } else {
     $('errorMsgs').classList.add('hidden');
   }
-  
-  const actionText = msg.dryRun ? 'готово к замене' : 'заменено';
-  toastOk(`${result.replaced} ${actionText}, ${state.currentNotFound.length} не найдено.`);
 }
 
 export function onDetach(result) {
@@ -134,15 +159,20 @@ export function onDetach(result) {
     $('errorMsgs').classList.remove('hidden');
     msgList('errorMsgs', result.errors, 'msg-r', '✕ ');
   }
-  
-  state.currentNotFound = [];
-  $('migrator-notfound-count').textContent = '0 не найдено';
-  $('tab-notfound-count').textContent = '0';
+
+  if (!result.errors.length && state.detachTarget) {
+    state.currentNotFound = state.currentNotFound.filter(name => name !== state.detachTarget);
+    state.detachTarget = '';
+  } else if (!state.detachTarget) {
+    state.currentNotFound = [];
+  }
+  $('migrator-notfound-count').textContent = state.currentNotFound.length + ' не найдено';
+  $('tab-notfound-count').textContent = state.currentNotFound.length;
   renderVarList();
-  
+
   if (!result.errors.length) {
     toastOk(`Отвязано ${result.detached} стилей/переменных.`);
   }
 }
 
-export function renderNotFound() {} // Kept to avoid undefined reference from old handlers.js if any
+export function renderNotFound() {}

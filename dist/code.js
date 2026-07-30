@@ -1449,7 +1449,8 @@
       variableId: u.variableId,
       variableName: u.variableName,
       collectionName: u.collectionName,
-      locationCount: u.locations.length
+      locationCount: u.locations.length,
+      locations: u.locations.map((l) => ({ nodeId: l.nodeId, nodeName: l.nodeName }))
     }));
     return { variables, nodeCount: totalNodes };
   }
@@ -1746,6 +1747,27 @@
     }
   });
 
+  // src/plugin/focus-nodes.ts
+  function focusNodesByIds(nodeIds) {
+    return __async(this, null, function* () {
+      const unique = [...new Set((nodeIds || []).filter(Boolean))];
+      if (!unique.length) return;
+      const nodes = [];
+      for (const id of unique) {
+        const node = yield figma.getNodeByIdAsync(id);
+        if (node && "x" in node) nodes.push(node);
+      }
+      if (!nodes.length) return;
+      figma.currentPage.selection = nodes;
+      figma.viewport.scrollAndZoomIntoView(nodes);
+    });
+  }
+  var init_focus_nodes = __esm({
+    "src/plugin/focus-nodes.ts"() {
+      "use strict";
+    }
+  });
+
   // src/plugin/code.ts
   var require_code = __commonJS({
     "src/plugin/code.ts"(exports) {
@@ -1757,6 +1779,7 @@
       init_migrate();
       init_detach();
       init_utils();
+      init_focus_nodes();
       figma.showUI(__html__, { width: 450, height: 600, themeColors: true });
       (() => __async(null, null, function* () {
         const meta = yield loadSnapshotMeta();
@@ -1838,10 +1861,17 @@
           yield runGlobalScan(msg.type, roots);
         }
         if (msg.type === "focus-node") {
-          const node = yield figma.getNodeByIdAsync(msg.nodeId);
-          if (node) {
-            figma.currentPage.selection = [node];
-            figma.viewport.scrollAndZoomIntoView([node]);
+          yield focusNodesByIds([msg.nodeId]);
+        }
+        if (msg.type === "focus-nodes") {
+          yield focusNodesByIds(msg.nodeIds || []);
+        }
+        if (msg.type === "FOCUS_VARIABLE") {
+          if (scanData) {
+            const usage = Array.from(scanData.values()).find((u) => u.variableName === msg.name);
+            if (usage == null ? void 0 : usage.locations.length) {
+              yield focusNodesByIds(usage.locations.map((loc) => loc.nodeId));
+            }
           }
         }
         if (msg.type === "resize") {

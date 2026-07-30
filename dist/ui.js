@@ -1,6 +1,8 @@
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
+  var __defProps = Object.defineProperties;
+  var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __getOwnPropSymbols = Object.getOwnPropertySymbols;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
@@ -17,6 +19,7 @@
       }
     return a;
   };
+  var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
   var __esm = (fn, res, err) => function __init() {
     if (err) throw err[0];
     try {
@@ -64,6 +67,7 @@
           /** @type {string[]} */
           []
         ),
+        detachTarget: "",
         scanTotal: 0
       };
       colState = /* @__PURE__ */ new Map();
@@ -216,6 +220,96 @@
     }
   });
 
+  // src/ui/shared/focus-nodes.js
+  function focusNodes(nodeIds) {
+    const ids = [...new Set((nodeIds || []).filter(Boolean))];
+    if (!ids.length) return;
+    parent.postMessage({ pluginMessage: { type: "focus-nodes", nodeIds: ids } }, "*");
+  }
+  var init_focus_nodes = __esm({
+    "src/ui/shared/focus-nodes.js"() {
+      "use strict";
+    }
+  });
+
+  // src/ui/migrator/var-rows.js
+  function appendVarRow(list, { color, title, meta, nodeIds, detachName, detachCount }) {
+    const d = document.createElement("div");
+    d.className = "var-item-new";
+    d.onclick = () => focusNodes(nodeIds);
+    const detachHtml = detachName ? `<div class="var-item-actions">
+        <span class="var-item-count">${detachCount || 0}</span>
+        <button class="var-item-detach" type="button" title="\u041E\u0442\u0432\u044F\u0437\u0430\u0442\u044C \u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u0443\u044E">${DETACH_SVG}</button>
+      </div>` : "";
+    d.innerHTML = `
+    <div class="var-item-row">
+      <div class="var-item-dot">
+        <div class="dot-icon" style="color:${color}">${DOT_SVG}</div>
+      </div>
+      <div class="var-item-title">
+        ${title}${meta ? ` <span class="var-item-meta">${meta}</span>` : ""}
+      </div>
+      ${detachHtml}
+    </div>
+  `;
+    if (detachName) {
+      d.querySelector(".var-item-detach").addEventListener("click", (event) => {
+        event.stopPropagation();
+        state.detachTarget = detachName;
+        post("DETACH_NOT_FOUND", { names: [detachName] });
+      });
+    }
+    list.appendChild(d);
+  }
+  function renderGroupedOrExpanded(list, {
+    color,
+    collectionName,
+    name,
+    locations,
+    locationCount,
+    grouped,
+    canDetach = false
+  }) {
+    const locs = locations || [];
+    const nodeIds = locs.map((l) => l.nodeId);
+    const fullPath = [collectionName, name].filter(Boolean).join(" / ");
+    const detachName = canDetach ? name : "";
+    const detachCount = locationCount != null ? locationCount : locs.length;
+    if (grouped || !locs.length) {
+      appendVarRow(list, {
+        color,
+        title: x(fullPath),
+        meta: locationCount != null ? `${locationCount}\u0445` : locs.length ? `${locs.length}\u0445` : "",
+        nodeIds,
+        detachName,
+        detachCount
+      });
+      return;
+    }
+    for (const loc of locs) {
+      appendVarRow(list, {
+        color,
+        title: x(fullPath),
+        meta: x(loc.nodeName),
+        nodeIds: [loc.nodeId],
+        detachName,
+        detachCount
+      });
+    }
+  }
+  var DOT_SVG, DETACH_SVG;
+  var init_var_rows = __esm({
+    "src/ui/migrator/var-rows.js"() {
+      "use strict";
+      init_helpers();
+      init_helpers();
+      init_focus_nodes();
+      init_state();
+      DOT_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg>`;
+      DETACH_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4.98075 6.85535L3.49178 8.34432C2.93569 8.90041 2.6159 9.65705 2.62175 10.4523C2.62759 11.2475 2.94038 12.0087 3.52286 12.5732C4.08731 13.1557 4.84873 13.4685 5.64381 13.4743C6.45703 13.4803 7.19576 13.1785 7.75188 12.6224L9.24085 11.1335M11.1427 9.26796L12.6317 7.77899C13.1878 7.2229 13.5076 6.46626 13.5017 5.67105C13.4959 4.87584 13.1831 4.11459 12.6006 3.5501C12.0363 2.98577 11.275 2.67297 10.4798 2.66712C9.68459 2.66128 8.92785 2.96291 8.37173 3.51902L6.88276 5.00799M5.80381 10.2798L10.2707 5.81286M3.55752 3.47798L2.81998 2.74045M6.11852 2.17882L6.23918 0.963135M1.1479 6.05419L2.40833 5.92909M12.6273 12.3371L13.3648 13.0746M10.0663 13.6362L9.94561 14.8519M15.0369 9.76085L13.7765 9.88595" stroke="currentColor" stroke-opacity="1" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+  });
+
   // src/ui/migrator/results-ui.js
   function initTabs() {
     var _a, _b;
@@ -229,6 +323,16 @@
       updateTabs();
       renderVarList();
     });
+  }
+  function initGroupSwitch() {
+    var _a;
+    (_a = $("group-migrator-switch")) == null ? void 0 : _a.addEventListener("change", () => {
+      renderVarList();
+    });
+  }
+  function isGrouped() {
+    var _a;
+    return !!((_a = $("group-migrator-switch")) == null ? void 0 : _a.checked);
   }
   function updateTabs() {
     if (currentTab === "notfound") {
@@ -258,49 +362,68 @@
     updateTabs();
     renderVarList();
   }
+  function findVar(name) {
+    var _a;
+    return ((_a = lastScanResult == null ? void 0 : lastScanResult.variables) == null ? void 0 : _a.find((v) => v.variableName === name)) || null;
+  }
+  function updateTabCounts(grouped) {
+    if (!lastScanResult) return;
+    if (grouped) {
+      $("tab-allvars-count").textContent = lastScanResult.variables.length;
+      $("tab-notfound-count").textContent = state.currentNotFound.length;
+      return;
+    }
+    $("tab-allvars-count").textContent = lastScanResult.variables.reduce(
+      (n, v) => {
+        var _a;
+        return n + (((_a = v.locations) == null ? void 0 : _a.length) || 1);
+      },
+      0
+    );
+    $("tab-notfound-count").textContent = state.currentNotFound.reduce((n, name) => {
+      var _a;
+      const v = findVar(name);
+      return n + (((_a = v == null ? void 0 : v.locations) == null ? void 0 : _a.length) || 1);
+    }, 0);
+  }
   function renderVarList() {
     const list = $("varList");
     list.innerHTML = "";
+    const grouped = isGrouped();
+    updateTabCounts(grouped);
     if (currentTab === "notfound") {
       if (!state.currentNotFound.length) {
-        list.innerHTML = '<div style="font-size:12px;color:rgba(0,0,0,0.4);text-align:center;padding:12px;">\u041D\u0435\u0442 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u043D\u044B\u0445 \u0442\u043E\u043A\u0435\u043D\u043E\u0432</div>';
+        list.innerHTML = '<div class="var-list-empty">\u041D\u0435\u0442 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u043D\u044B\u0445 \u0442\u043E\u043A\u0435\u043D\u043E\u0432</div>';
         return;
       }
       for (const name of state.currentNotFound) {
-        const d = document.createElement("div");
-        d.className = "var-item-new";
-        d.innerHTML = `
-        <div style="display:inline-flex; align-items:flex-start; gap:4px;">
-          <div style="width:16px; height:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-             <div style="width:6px; height:6px; background:#F59E0B; border-radius:1px;"></div>
-          </div>
-          <div style="color:black; font-size:12px; font-weight:500; line-height:16px; word-wrap:break-word;">${x(name)}</div>
-        </div>
-      `;
-        list.appendChild(d);
+        const v = findVar(name);
+        renderGroupedOrExpanded(list, {
+          color: "#F59E0B",
+          collectionName: v == null ? void 0 : v.collectionName,
+          name,
+          locations: (v == null ? void 0 : v.locations) || [],
+          grouped,
+          canDetach: true
+        });
       }
-    } else {
-      if (!lastScanResult || !lastScanResult.variables.length) {
-        list.innerHTML = '<div style="font-size:12px;color:rgba(0,0,0,0.4);text-align:center;padding:12px;">\u041F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B</div>';
-        return;
-      }
-      for (const v of lastScanResult.variables) {
-        const isNotFound = state.currentNotFound.includes(v.variableName);
-        const color = isNotFound ? "#F59E0B" : "#0ADB29";
-        const d = document.createElement("div");
-        d.className = "var-item-new";
-        d.innerHTML = `
-        <div style="display:inline-flex; align-items:flex-start; gap:4px;">
-          <div style="width:16px; height:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-             <div style="width:6px; height:6px; background:${color}; border-radius:1px;"></div>
-          </div>
-          <div style="color:black; font-size:12px; font-weight:500; line-height:16px; word-wrap:break-word;">
-            ${x(v.variableName)} <span style="color:rgba(0,0,0,0.4);font-weight:400;margin-left:4px;">${v.locationCount}\u0445</span>
-          </div>
-        </div>
-      `;
-        list.appendChild(d);
-      }
+      return;
+    }
+    if (!lastScanResult || !lastScanResult.variables.length) {
+      list.innerHTML = '<div class="var-list-empty">\u041F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B</div>';
+      return;
+    }
+    for (const v of lastScanResult.variables) {
+      const isNotFound = state.currentNotFound.includes(v.variableName);
+      renderGroupedOrExpanded(list, {
+        color: isNotFound ? "#F59E0B" : "#0ADB29",
+        collectionName: v.collectionName,
+        name: v.variableName,
+        locations: v.locations || [],
+        locationCount: v.locationCount,
+        grouped,
+        canDetach: isNotFound
+      });
     }
   }
   function onMigrate(msg) {
@@ -321,8 +444,6 @@
     } else {
       $("errorMsgs").classList.add("hidden");
     }
-    const actionText = msg.dryRun ? "\u0433\u043E\u0442\u043E\u0432\u043E \u043A \u0437\u0430\u043C\u0435\u043D\u0435" : "\u0437\u0430\u043C\u0435\u043D\u0435\u043D\u043E";
-    toastOk(`${result.replaced} ${actionText}, ${state.currentNotFound.length} \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E.`);
   }
   function onDetach(result) {
     setBtn("btnDetach", false);
@@ -330,9 +451,14 @@
       $("errorMsgs").classList.remove("hidden");
       msgList("errorMsgs", result.errors, "msg-r", "\u2715 ");
     }
-    state.currentNotFound = [];
-    $("migrator-notfound-count").textContent = "0 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E";
-    $("tab-notfound-count").textContent = "0";
+    if (!result.errors.length && state.detachTarget) {
+      state.currentNotFound = state.currentNotFound.filter((name) => name !== state.detachTarget);
+      state.detachTarget = "";
+    } else if (!state.detachTarget) {
+      state.currentNotFound = [];
+    }
+    $("migrator-notfound-count").textContent = state.currentNotFound.length + " \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E";
+    $("tab-notfound-count").textContent = state.currentNotFound.length;
     renderVarList();
     if (!result.errors.length) {
       toastOk(`\u041E\u0442\u0432\u044F\u0437\u0430\u043D\u043E ${result.detached} \u0441\u0442\u0438\u043B\u0435\u0439/\u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0445.`);
@@ -344,6 +470,7 @@
       "use strict";
       init_state();
       init_helpers();
+      init_var_rows();
       lastScanResult = null;
       currentTab = "allvars";
     }
@@ -418,6 +545,7 @@
   function initDetachButton() {
     $("btnDetach").addEventListener("click", () => {
       if (!state.currentNotFound.length) return;
+      state.detachTarget = "";
       setBtn("btnDetach", true, "\u041E\u0442\u0432\u044F\u0437\u043A\u0430\u2026");
       post("DETACH_NOT_FOUND", { names: state.currentNotFound });
     });
@@ -484,15 +612,187 @@
     }
   });
 
+  // src/ui/shared/group-issues.js
+  function groupIssues(items, keyFn) {
+    const grouped = /* @__PURE__ */ new Map();
+    for (const item of items || []) {
+      const key = keyFn(item);
+      if (grouped.has(key)) {
+        const existing = grouped.get(key);
+        existing.count += 1;
+        if (item.nodeId && !existing.nodeIds.includes(item.nodeId)) {
+          existing.nodeIds.push(item.nodeId);
+        }
+      } else {
+        grouped.set(key, __spreadProps(__spreadValues({}, item), {
+          count: 1,
+          nodeIds: item.nodeId ? [item.nodeId] : []
+        }));
+      }
+    }
+    return Array.from(grouped.values());
+  }
+  var init_group_issues = __esm({
+    "src/ui/shared/group-issues.js"() {
+      "use strict";
+    }
+  });
+
+  // src/ui/self-check/results.ts
+  function initSelfCheckResults() {
+    document.querySelectorAll("#page-main .sub-tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll("#page-main .sub-tab").forEach((t) => t.classList.remove("active"));
+        document.querySelectorAll("#page-main .results-list").forEach((c) => c.style.display = "none");
+        tab.classList.add("active");
+        currentSubTab = tab.dataset.tab;
+        updateEmptyState();
+      });
+    });
+    document.getElementById("group-issues-switch").addEventListener("change", () => {
+      if (latestRawResults) renderResults(latestRawResults);
+    });
+    window.focusIssueNodes = (idsCsv) => {
+      focusNodes(String(idsCsv || "").split(",").filter(Boolean));
+    };
+  }
+  function setScanStart(total) {
+    scanTotalNodes = total;
+    scanStartTime = Date.now();
+    const statsEl = document.getElementById("stats");
+    if (!statsEl) return;
+    statsEl.style.display = "flex";
+    document.getElementById("stats-time-text").innerText = `\u23F3 \u041F\u043E\u0434\u0433\u043E\u0442\u043E\u0432\u043A\u0430... (\u0412\u0441\u0435\u0433\u043E \u0443\u0437\u043B\u043E\u0432: ${scanTotalNodes})`;
+    const iconEl = document.getElementById("stats-icon");
+    if (iconEl) iconEl.style.display = "none";
+  }
+  function setScanProgress(count) {
+    const statsEl = document.getElementById("stats");
+    if (!statsEl) return;
+    statsEl.style.display = "flex";
+    const seconds = Math.floor((Date.now() - scanStartTime) / 1e3);
+    const minutes = Math.floor(seconds / 60);
+    const timeStr = minutes > 0 ? `${minutes}\u043C ${seconds % 60}\u0441` : `${seconds}\u0441`;
+    let percent = scanTotalNodes > 0 ? Math.floor(count / scanTotalNodes * 100) : 0;
+    if (percent > 100) percent = 100;
+    document.getElementById("stats-time-text").innerText = `\u23F3 \u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435... ${count} \u0438\u0437 ${scanTotalNodes} (${percent}%), \u043F\u0440\u043E\u0448\u043B\u043E ${timeStr}`;
+    const iconEl = document.getElementById("stats-icon");
+    if (iconEl) iconEl.style.display = "none";
+  }
+  function onScanResults(resultsData) {
+    latestRawResults = resultsData;
+    renderResults(latestRawResults);
+  }
+  function updateEmptyState() {
+    const list = document.getElementById(`results-${currentSubTab}`);
+    const emptyState = document.getElementById("empty-state");
+    if (list && list.children.length === 0) {
+      list.style.display = "none";
+      emptyState.style.display = "flex";
+    } else if (list) {
+      list.style.display = "flex";
+      emptyState.style.display = "none";
+    }
+  }
+  function renderIssueItem(item) {
+    var _a;
+    let dotClass = "dot-info";
+    if (item.severity === "error") dotClass = "dot-error";
+    else if (item.severity === "warning") dotClass = "dot-warning";
+    const ids = ((_a = item.nodeIds) == null ? void 0 : _a.length) ? item.nodeIds : item.nodeId ? [item.nodeId] : [];
+    const badgeHtml = item.count > 1 ? ` <span style="color: var(--color-primary)">(${item.count})</span>` : "";
+    const breadcrumbHtml = item.breadcrumb ? `<div class="issue-detail">\u0420\u043E\u0434\u0438\u0442\u0435\u043B\u044C: ${item.breadcrumb}</div>` : "";
+    return `
+    <div class="issue-card" onclick="focusIssueNodes('${ids.join(",")}')">
+      <div class="issue-header">
+        <div style="width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding-top: 2px;">
+          <div class="dot-icon ${dotClass}">${DOT_SVG2}</div>
+        </div>
+        <div class="issue-title">${item.errorType || "\u041E\u0448\u0438\u0431\u043A\u0430"}${badgeHtml}</div>
+      </div>
+      <div class="issue-detail">\u0418\u043C\u044F: ${item.name}</div>
+      ${breadcrumbHtml}
+    </div>
+  `;
+  }
+  function countBySeverity(data) {
+    const counts = { error: 0, warning: 0, info: 0 };
+    for (const item of data) {
+      const sev = item.severity;
+      if (sev in counts) counts[sev]++;
+    }
+    return counts;
+  }
+  function renderResults(resultsData) {
+    var _a, _b, _c;
+    const isGrouped2 = document.getElementById("group-issues-switch").checked;
+    const keyFn = (item) => `${item.name}-${item.errorType}`;
+    const processedResults = {
+      components: isGrouped2 ? groupIssues(resultsData.results.components, keyFn) : resultsData.results.components,
+      variables: isGrouped2 ? groupIssues(resultsData.results.variables, keyFn) : resultsData.results.variables,
+      gradients: isGrouped2 ? groupIssues(resultsData.results.gradients, keyFn) : resultsData.results.gradients
+    };
+    const statsEl = document.getElementById("stats");
+    const allIssues = [
+      ...processedResults.components || [],
+      ...processedResults.variables || [],
+      ...processedResults.gradients || []
+    ];
+    const totals = countBySeverity(allIssues);
+    if (statsEl) {
+      statsEl.style.display = "flex";
+      const seconds = Math.floor((Date.now() - scanStartTime) / 1e3);
+      document.getElementById("stats-time-text").textContent = `\u041F\u0440\u043E\u0432\u0435\u0440\u0435\u043D\u043E ${resultsData.scannedCount} \u0441\u043B\u043E\u0435\u0432 \u0437\u0430 ${seconds}\u0441`;
+      document.getElementById("stats-error").textContent = `${totals.error} \u0431\u043B\u043E\u043A\u0435\u0440`;
+      document.getElementById("stats-warning").textContent = `${totals.warning} \u043F\u0440\u0435\u0434\u0443\u043F\u0440.`;
+      document.getElementById("stats-info").textContent = `${totals.info} \u0438\u043D\u0444\u043E`;
+      const iconEl = document.getElementById("stats-icon");
+      if (iconEl) {
+        iconEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.2 5.59998L6.42698 10.4L4.79999 8.76379" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        iconEl.style.display = "flex";
+      }
+    }
+    document.getElementById("count-components").textContent = String(((_a = processedResults.components) == null ? void 0 : _a.length) || 0);
+    document.getElementById("count-variables").textContent = String(((_b = processedResults.variables) == null ? void 0 : _b.length) || 0);
+    document.getElementById("count-gradients").textContent = String(((_c = processedResults.gradients) == null ? void 0 : _c.length) || 0);
+    ["components", "variables", "gradients"].forEach((tabName) => {
+      const container = document.getElementById(`results-${tabName}`);
+      const data = (processedResults[tabName] || []).sort((a, b) => {
+        var _a2, _b2;
+        return ((_a2 = SEVERITY_ORDER[a.severity]) != null ? _a2 : 2) - ((_b2 = SEVERITY_ORDER[b.severity]) != null ? _b2 : 2);
+      });
+      container.innerHTML = data.length ? data.map(renderIssueItem).join("") : "";
+    });
+    updateEmptyState();
+  }
+  var SEVERITY_ORDER, latestRawResults, scanStartTime, scanTotalNodes, currentSubTab, DOT_SVG2;
+  var init_results = __esm({
+    "src/ui/self-check/results.ts"() {
+      "use strict";
+      init_group_issues();
+      init_focus_nodes();
+      SEVERITY_ORDER = { error: 0, warning: 1, info: 2 };
+      latestRawResults = null;
+      scanStartTime = 0;
+      scanTotalNodes = 0;
+      currentSubTab = "components";
+      DOT_SVG2 = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg>`;
+    }
+  });
+
   // src/ui/ui.ts
   var require_ui = __commonJS({
     "src/ui/ui.ts"(exports) {
       init_handlers();
+      init_results_ui();
+      init_results();
       initScanButton();
       initMigrateButton();
       initCopyButton();
       initDetachButton();
       initTabs();
+      initGroupSwitch();
+      initSelfCheckResults();
       parent.postMessage({ pluginMessage: { type: "GET_LIBRARIES" } }, "*");
       var themeBtn = document.getElementById("toggle-theme");
       var sunSVG = '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 2V3M8 13V14M2 8H3M13 8H14M3.76 3.76L4.47 4.47M11.53 11.53L12.24 12.24M12.24 3.76L11.53 4.47M4.47 11.53L3.76 12.24" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>';
@@ -532,141 +832,27 @@
       var expandSVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.76502 1.60001H14.3995M14.3995 1.60001V6.23449M14.3995 1.60001L8.9926 7.00691M6.23483 14.4H1.60034M1.60034 14.4V9.76552M1.60034 14.4L7.00724 8.99311" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       var collapseSVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.00724 13.6275L7.00724 8.99304L2.37276 8.99304M7.00724 8.99304L1.60034 14.3999M8.99253 2.37248V7.00697L13.627 7.00697M8.99253 7.00697L14.3994 1.60007" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       sizeBtn.onclick = () => {
+        var _a3;
         isExpanded = !isExpanded;
         sizeBtn.innerHTML = isExpanded ? collapseSVG : expandSVG;
+        (_a3 = document.getElementById("page-migrator")) == null ? void 0 : _a3.classList.toggle("expanded", isExpanded);
         parent.postMessage({ pluginMessage: { type: "resize", expanded: isExpanded } }, "*");
       };
-      var currentSubTab = "components";
-      document.querySelectorAll(".sub-tab").forEach((tab) => {
-        tab.addEventListener("click", () => {
-          document.querySelectorAll(".sub-tab").forEach((t) => t.classList.remove("active"));
-          document.querySelectorAll(".results-list").forEach((c) => c.style.display = "none");
-          tab.classList.add("active");
-          currentSubTab = tab.dataset.tab;
-          updateEmptyState();
-        });
-      });
-      function updateEmptyState() {
-        const list = document.getElementById(`results-${currentSubTab}`);
-        const emptyState = document.getElementById("empty-state");
-        if (list && list.children.length === 0) {
-          list.style.display = "none";
-          emptyState.style.display = "flex";
-        } else if (list) {
-          list.style.display = "flex";
-          emptyState.style.display = "none";
-        }
-      }
       document.getElementById("scan-selection").onclick = () => {
         parent.postMessage({ pluginMessage: { type: "scan-selection" } }, "*");
       };
       document.getElementById("scan-page").onclick = () => {
         parent.postMessage({ pluginMessage: { type: "scan-page" } }, "*");
       };
-      document.getElementById("group-issues-switch").addEventListener("change", () => {
-        if (latestRawResults) {
-          renderResults(latestRawResults);
-        }
-      });
       document.getElementById("update-snapshot").onclick = () => {
         const btn = document.getElementById("update-snapshot");
         btn.disabled = true;
         document.getElementById("update-snapshot-text").textContent = "\u23F3 \u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435...";
         parent.postMessage({ pluginMessage: { type: "update-snapshot" } }, "*");
       };
-      var SEVERITY_ORDER = { error: 0, warning: 1, info: 2 };
-      var latestRawResults = null;
-      var scanTotalNodes = 0;
-      var scanStartTime = 0;
-      function groupResultsArray(resultsArray) {
-        const grouped = /* @__PURE__ */ new Map();
-        for (const item of resultsArray) {
-          const key = `${item.name}-${item.errorType}`;
-          if (grouped.has(key)) {
-            const existing = grouped.get(key);
-            existing.count += 1;
-          } else {
-            grouped.set(key, __spreadValues({}, item));
-          }
-        }
-        return Array.from(grouped.values());
-      }
-      function renderIssueItem(item) {
-        let dotClass = "dot-info";
-        if (item.severity === "error") dotClass = "dot-error";
-        else if (item.severity === "warning") dotClass = "dot-warning";
-        const badgeHtml = item.count > 1 ? ` <span style="color: var(--color-primary)">(${item.count})</span>` : "";
-        const breadcrumbHtml = item.breadcrumb ? `
-  <div class="issue-detail">\u0420\u043E\u0434\u0438\u0442\u0435\u043B\u044C: ${item.breadcrumb}</div>` : "";
-        return `
-    <div class="issue-card" onclick="focusNode('${item.nodeId}')">
-      <div class="issue-header">
-        <div style="width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding-top: 2px;">
-          <div class="dot-icon ${dotClass}"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg></div>
-        </div>
-        <div class="issue-title">${item.errorType || "\u041E\u0448\u0438\u0431\u043A\u0430"}${badgeHtml}</div>
-      </div>
-      <div class="issue-detail">\u0418\u043C\u044F: ${item.name}</div>
-      ${breadcrumbHtml}
-    </div>
-  `;
-      }
-      function countBySeverity(data) {
-        const counts = { error: 0, warning: 0, info: 0 };
-        for (const item of data) {
-          const sev = item.severity;
-          if (sev in counts) counts[sev]++;
-        }
-        return counts;
-      }
-      function renderResults(resultsData) {
-        var _a3, _b, _c;
-        const isGrouped = document.getElementById("group-issues-switch").checked;
-        const processedResults = {
-          components: isGrouped ? groupResultsArray(resultsData.results.components) : resultsData.results.components,
-          variables: isGrouped ? groupResultsArray(resultsData.results.variables) : resultsData.results.variables,
-          gradients: isGrouped ? groupResultsArray(resultsData.results.gradients) : resultsData.results.gradients
-        };
-        const statsEl = document.getElementById("stats");
-        const allIssues = [
-          ...processedResults.components || [],
-          ...processedResults.variables || [],
-          ...processedResults.gradients || []
-        ];
-        const totals = countBySeverity(allIssues);
-        if (statsEl) {
-          statsEl.style.display = "flex";
-          const elapsedMs = Date.now() - scanStartTime;
-          const seconds = Math.floor(elapsedMs / 1e3);
-          document.getElementById("stats-time-text").textContent = `\u041F\u0440\u043E\u0432\u0435\u0440\u0435\u043D\u043E ${resultsData.scannedCount} \u0441\u043B\u043E\u0435\u0432 \u0437\u0430 ${seconds}\u0441`;
-          document.getElementById("stats-error").textContent = `${totals.error} \u0431\u043B\u043E\u043A\u0435\u0440`;
-          document.getElementById("stats-warning").textContent = `${totals.warning} \u043F\u0440\u0435\u0434\u0443\u043F\u0440.`;
-          document.getElementById("stats-info").textContent = `${totals.info} \u0438\u043D\u0444\u043E`;
-          const iconEl = document.getElementById("stats-icon");
-          if (iconEl) {
-            iconEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.2 5.59998L6.42698 10.4L4.79999 8.76379" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-            iconEl.style.display = "flex";
-          }
-        }
-        document.getElementById("count-components").textContent = String(((_a3 = processedResults.components) == null ? void 0 : _a3.length) || 0);
-        document.getElementById("count-variables").textContent = String(((_b = processedResults.variables) == null ? void 0 : _b.length) || 0);
-        document.getElementById("count-gradients").textContent = String(((_c = processedResults.gradients) == null ? void 0 : _c.length) || 0);
-        ["components", "variables", "gradients"].forEach((tabName) => {
-          const container = document.getElementById(`results-${tabName}`);
-          const data = (processedResults[tabName] || []).sort((a, b) => {
-            var _a4, _b2;
-            return ((_a4 = SEVERITY_ORDER[a.severity]) != null ? _a4 : 2) - ((_b2 = SEVERITY_ORDER[b.severity]) != null ? _b2 : 2);
-          });
-          if (data.length === 0) {
-            container.innerHTML = "";
-          } else {
-            container.innerHTML = data.map(renderIssueItem).join("");
-          }
-        });
-        updateEmptyState();
-      }
       window.onmessage = (event) => __async(null, null, function* () {
         const pluginMessage = event.data.pluginMessage;
+        if (!pluginMessage) return;
         if (pluginMessage.type === "init-theme") {
           isDarkTheme = pluginMessage.theme === "dark";
           applyTheme();
@@ -679,9 +865,7 @@
             text1.textContent = `\u23F3 \u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u044D\u0442\u0430\u043B\u043E\u043D\u0430... \u0441\u0442\u0440. \xAB${pluginMessage.page}\xBB, \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u0430\u043D\u043E: ${pluginMessage.processed}`;
             text1.style.color = "var(--color-black-60)";
           }
-          if (text2) {
-            text2.style.display = "none";
-          }
+          if (text2) text2.style.display = "none";
         }
         if (pluginMessage.type === "snapshot-saved" || pluginMessage.type === "snapshot-info") {
           const text1 = document.getElementById("scan-status-text1");
@@ -692,56 +876,33 @@
             document.getElementById("update-snapshot-text").textContent = "\u041E\u0431\u043D\u043E\u0432\u0438 \u044D\u0442\u0430\u043B\u043E\u043D \u0414\u0421";
           }
           if (text1) {
-            const date = new Date(pluginMessage.updatedAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+            const date = new Date(pluginMessage.updatedAt).toLocaleString("ru-RU", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit"
+            });
             text1.textContent = `\u2705 \u042D\u0442\u0430\u043B\u043E\u043D: ${pluginMessage.count} \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432 \u0438\u0437 "${pluginMessage.fileKey}" (${date})`;
             text1.style.color = "var(--color-black-80)";
           }
-          if (text2) {
-            text2.style.display = "none";
-          }
+          if (text2) text2.style.display = "none";
           const statusText1 = document.querySelector("#snapshot-status .status-text:nth-child(1)");
           const statusText2 = document.querySelector("#snapshot-status .status-text:nth-child(2)");
           if (statusText1) {
             statusText1.textContent = `\u2705 \u042D\u0442\u0430\u043B\u043E\u043D: \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D. `;
             statusText1.style.color = "#4caf50";
           }
-          if (statusText2) {
-            statusText2.style.display = "none";
-          }
+          if (statusText2) statusText2.style.display = "none";
         }
         if (pluginMessage.type === "scan-start") {
-          scanTotalNodes = pluginMessage.total;
-          scanStartTime = Date.now();
-          const statsEl = document.getElementById("stats");
-          if (statsEl) {
-            statsEl.style.display = "flex";
-            document.getElementById("stats-time-text").innerText = `\u23F3 \u041F\u043E\u0434\u0433\u043E\u0442\u043E\u0432\u043A\u0430... (\u0412\u0441\u0435\u0433\u043E \u0443\u0437\u043B\u043E\u0432: ${scanTotalNodes})`;
-            const iconEl = document.getElementById("stats-icon");
-            if (iconEl) iconEl.style.display = "none";
-          }
+          setScanStart(pluginMessage.total);
         }
         if (pluginMessage.type === "scan-progress") {
-          const statsEl = document.getElementById("stats");
-          if (statsEl) {
-            statsEl.style.display = "flex";
-            const elapsedMs = Date.now() - scanStartTime;
-            const seconds = Math.floor(elapsedMs / 1e3);
-            const minutes = Math.floor(seconds / 60);
-            const displaySec = seconds % 60;
-            const timeStr = minutes > 0 ? `${minutes}\u043C ${displaySec}\u0441` : `${displaySec}\u0441`;
-            let percent = 0;
-            if (scanTotalNodes > 0) {
-              percent = Math.floor(pluginMessage.count / scanTotalNodes * 100);
-              if (percent > 100) percent = 100;
-            }
-            document.getElementById("stats-time-text").innerText = `\u23F3 \u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435... ${pluginMessage.count} \u0438\u0437 ${scanTotalNodes} (${percent}%), \u043F\u0440\u043E\u0448\u043B\u043E ${timeStr}`;
-            const iconEl = document.getElementById("stats-icon");
-            if (iconEl) iconEl.style.display = "none";
-          }
+          setScanProgress(pluginMessage.count);
         }
         if (pluginMessage.type === "scan-results") {
-          latestRawResults = pluginMessage;
-          renderResults(latestRawResults);
+          onScanResults(pluginMessage);
           handleMigratorMessage({
             type: "SCAN_COMPLETE",
             result: pluginMessage.migratorResult,
@@ -749,9 +910,6 @@
           });
         }
       });
-      window.focusNode = (nodeId) => {
-        parent.postMessage({ pluginMessage: { type: "focus-node", nodeId } }, "*");
-      };
     }
   });
   require_ui();
