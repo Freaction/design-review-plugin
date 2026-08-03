@@ -555,12 +555,10 @@ body {
   overflow-y: auto;
   gap: 12px;
 }
-#page-libraries .lib-tree-wrapper,
-#page-libraries .lib-tree-wrapper-tall {
+#page-libraries .lib-tree-wrapper {
   max-height: 360px;
 }
-.page.expanded#page-libraries .lib-tree-wrapper,
-.page.expanded#page-libraries .lib-tree-wrapper-tall {
+.page.expanded#page-libraries .lib-tree-wrapper {
   max-height: 560px;
 }
 

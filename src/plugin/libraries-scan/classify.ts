@@ -1,6 +1,6 @@
 import type { LibAcc } from './types';
 
-export type Classified = { category: string; name: string; key: string } | null;
+type Classified = { category: string; name: string; key: string } | null;
 
 const BATCH = 40;
 
@@ -52,7 +52,7 @@ async function classifyOne(
   return result;
 }
 
-export type ClassifyStats = {
+type ClassifyStats = {
   remote: number;
   local: number;
   broken: number;

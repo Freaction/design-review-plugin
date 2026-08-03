@@ -76,5 +76,3 @@ export async function saveFailCache(fails: Set<string>): Promise<void> {
     } catch {}
   }
 }
-
-export type { Resolved };
