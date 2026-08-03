@@ -3,8 +3,3 @@ export function focusNodes(nodeIds) {
   if (!ids.length) return;
   parent.postMessage({ pluginMessage: { type: 'focus-nodes', nodeIds: ids } }, '*');
 }
-
-export function focusNode(nodeId) {
-  if (!nodeId) return;
-  focusNodes([nodeId]);
-}

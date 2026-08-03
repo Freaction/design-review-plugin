@@ -53,9 +53,9 @@ export async function scanNode(
 
   counter.n++;
 
-  if (onProgress && counter.n % 500 === 0) {
+  if (onProgress && counter.n % 100 === 0) {
     onProgress(counter.n);
-    await new Promise(resolve => setTimeout(resolve, 5));
+    await new Promise(resolve => setTimeout(resolve, 0));
   }
 
   const isComp =
@@ -68,18 +68,24 @@ export async function scanNode(
 
   scanNodeForMigrator(node, migratorMap);
 
-  const needsComponentValidation = node.type === 'INSTANCE' || node.type === 'FRAME' || node.type === 'COMPONENT_SET' || node.type === 'COMPONENT';
+  const needsComponentValidation =
+    node.type === 'INSTANCE' ||
+    node.type === 'FRAME' ||
+    node.type === 'COMPONENT_SET' ||
+    node.type === 'COMPONENT';
   if (needsComponentValidation) {
     await validateComponent(node, results, snapshot, nodeBreadcrumb);
   }
 
-  const needsVariablesValidation = ('fills' in node && Array.isArray(node.fills) && node.fills.length > 0) || ('strokes' in node && Array.isArray(node.strokes) && node.strokes.length > 0) || node.type === 'TEXT';
+  const needsVariablesValidation =
+    ('fills' in node && Array.isArray(node.fills) && node.fills.length > 0) ||
+    ('strokes' in node && Array.isArray(node.strokes) && node.strokes.length > 0) ||
+    node.type === 'TEXT';
   if (needsVariablesValidation) {
     await validateVariables(node, results, isComp, nodeBreadcrumb);
   }
 
-  const needsGradientValidation = ('fills' in node && Array.isArray(node.fills) && node.fills.length > 0);
-  if (needsGradientValidation) {
+  if ('fills' in node && Array.isArray(node.fills) && node.fills.length > 0) {
     await validateGradients(node, results, nodeBreadcrumb);
   }
 

@@ -10,6 +10,7 @@ import { initGroupSwitch } from './migrator/results-ui.js';
 import {
   initSelfCheckResults,
   setScanStart,
+  setScanLoadingPages,
   setScanProgress,
   onScanResults,
 } from './self-check/results';
@@ -22,6 +23,8 @@ import {
   showScanProgress,
   showScanStats,
 } from './self-check/snapshot-status';
+import { initLibrariesTab, handleLibrariesMessage } from './libraries/handlers.js';
+import { initFigmaTokenUi, applyTokenStatus } from './self-check/figma-token-ui';
 
 initScanButton();
 initMigrateButton();
@@ -31,6 +34,8 @@ initTabs();
 initGroupSwitch();
 initSelfCheckResults();
 initSnapshotUi();
+initLibrariesTab();
+initFigmaTokenUi();
 
 parent.postMessage({ pluginMessage: { type: 'GET_LIBRARIES' } }, '*');
 
@@ -75,6 +80,7 @@ sizeBtn.onclick = () => {
   isExpanded = !isExpanded;
   sizeBtn.innerHTML = isExpanded ? collapseSVG : expandSVG;
   document.getElementById('page-migrator')?.classList.toggle('expanded', isExpanded);
+  document.getElementById('page-libraries')?.classList.toggle('expanded', isExpanded);
   parent.postMessage({ pluginMessage: { type: 'resize', expanded: isExpanded } }, '*');
 };
 
@@ -103,7 +109,12 @@ window.onmessage = async (event) => {
     applyTheme();
   }
 
+  if (pluginMessage.type === 'figma-token-info') {
+    applyTokenStatus(pluginMessage);
+  }
+
   handleMigratorMessage(pluginMessage);
+  handleLibrariesMessage(pluginMessage);
 
   if (pluginMessage.type === 'snapshot-progress') {
     showScanProgress(pluginMessage);
@@ -166,16 +177,22 @@ window.onmessage = async (event) => {
       version: pluginMessage.meta.version,
       u: pluginMessage.storage.u,
       f: pluginMessage.storage.f,
+      pagesScanned: pluginMessage.meta.pagesScanned,
+      pagesTotal: pluginMessage.meta.pagesTotal,
       c: pluginMessage.storage.c,
     });
   }
 
   if (pluginMessage.type === 'scan-start') {
-    setScanStart(pluginMessage.total);
+    setScanStart();
+  }
+
+  if (pluginMessage.type === 'scan-loading-pages') {
+    setScanLoadingPages();
   }
 
   if (pluginMessage.type === 'scan-progress') {
-    setScanProgress(pluginMessage.count);
+    setScanProgress(pluginMessage.count, pluginMessage.total, pluginMessage.label);
   }
 
   if (pluginMessage.type === 'scan-results') {

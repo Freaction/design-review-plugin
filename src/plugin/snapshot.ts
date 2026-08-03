@@ -12,12 +12,16 @@ export interface SnapshotStorage {
   c: ComponentSnapshot[];
   u: string;
   f: string;
+  fn?: string;
   version?: string;
+  pagesScanned?: number;
+  pagesTotal?: number;
 }
 
 export interface SnapshotMeta {
   updatedAt: string;
   fileKey: string;
+  fileName?: string;
   count: number;
   version?: string;
   source?: 'local' | 'remote';
@@ -67,14 +71,15 @@ function buildMeta(storage: SnapshotStorage, source: 'local' | 'remote'): Snapsh
   return {
     updatedAt: storage.u,
     fileKey: storage.f,
+    fileName: storage.fn,
     count: storage.c.length,
     version: storage.version,
     source,
   };
 }
 
-async function persist(storage: SnapshotStorage, source: 'local' | 'remote') {
-  const meta = buildMeta(storage, source);
+async function persist(storage: SnapshotStorage, source: 'local' | 'remote', extra: Partial<SnapshotMeta> = {}) {
+  const meta = { ...buildMeta(storage, source), ...extra };
   await figma.clientStorage.setAsync(STORAGE_KEY, storage);
   await figma.clientStorage.setAsync(STORAGE_KEY_META, meta);
   return meta;
@@ -158,27 +163,37 @@ export async function saveSnapshot(version?: string): Promise<SnapshotMeta> {
   const storage: SnapshotStorage = {
     c: components,
     u: new Date().toISOString(),
-    f: figma.root.name,
+    f: figma.fileKey || '',
+    fn: figma.root.name,
     version: version || new Date().toISOString().slice(0, 10).replace(/-/g, '.'),
+    pagesScanned,
+    pagesTotal,
   };
 
-  console.log(`[DS Snapshot] Полная замена эталона: ${components.length} компонентов из "${storage.f}"`);
-  const meta = await persist(storage, 'local');
-  return { ...meta, pagesScanned, pagesTotal, elapsedMs };
+  console.log(`[DS Snapshot] Полная замена эталона: ${components.length} компонентов, ${pagesScanned}/${pagesTotal} стр.`);
+  return persist(storage, 'local', { pagesScanned, pagesTotal, elapsedMs });
 }
 
-export async function saveRemoteSnapshot(storage: SnapshotStorage): Promise<SnapshotMeta> {
+export async function saveRemoteSnapshot(
+  storage: SnapshotStorage,
+  remoteMeta: Partial<SnapshotMeta> = {},
+): Promise<SnapshotMeta> {
   if (!storage?.c || !Array.isArray(storage.c) || storage.c.length === 0) {
     throw new Error('Некорректный или пустой snapshot');
   }
+  const pagesScanned = remoteMeta.pagesScanned ?? storage.pagesScanned;
+  const pagesTotal = remoteMeta.pagesTotal ?? storage.pagesTotal;
   const normalized: SnapshotStorage = {
     c: storage.c,
     u: storage.u || new Date().toISOString(),
-    f: storage.f || 'UI-Kit',
-    version: storage.version,
+    f: storage.f || '',
+    fn: storage.fn,
+    version: storage.version ?? remoteMeta.version,
+    pagesScanned,
+    pagesTotal,
   };
   console.log(`[DS Snapshot] Полная замена эталона с GitHub: ${normalized.c.length} компонентов`);
-  return persist(normalized, 'remote');
+  return persist(normalized, 'remote', { pagesScanned, pagesTotal, version: normalized.version });
 }
 
 export async function loadSnapshot(): Promise<SnapshotStorage | null> {

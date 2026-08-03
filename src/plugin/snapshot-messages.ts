@@ -4,7 +4,7 @@ export async function handleSnapshotMessage(msg: any): Promise<boolean> {
   if (msg.type === 'update-snapshot') {
     try {
       const meta = await saveSnapshot(msg.version);
-      figma.notify(`✅ Эталон обновлён: ${meta.count} компонентов из "${meta.fileKey}"`);
+      figma.notify(`✅ Эталон обновлён: ${meta.count} компонентов из "${meta.fileName || meta.fileKey || 'UI-Kit'}"`);
       figma.ui.postMessage({ type: 'snapshot-saved', ...meta });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -16,7 +16,7 @@ export async function handleSnapshotMessage(msg: any): Promise<boolean> {
 
   if (msg.type === 'save-remote-snapshot') {
     try {
-      const meta = await saveRemoteSnapshot(msg.storage);
+      const meta = await saveRemoteSnapshot(msg.storage, msg.remoteMeta || {});
       figma.notify(`✅ Эталон с GitHub: v${meta.version || '—'} · ${meta.count} компонентов`);
       figma.ui.postMessage({ type: 'snapshot-remote-saved', ...meta });
     } catch (err) {
@@ -43,6 +43,8 @@ export async function handleSnapshotMessage(msg: any): Promise<boolean> {
         updatedAt: meta.updatedAt,
         count: meta.count,
         fileKey: meta.fileKey,
+        pagesScanned: meta.pagesScanned,
+        pagesTotal: meta.pagesTotal,
       },
     });
     return true;

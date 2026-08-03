@@ -1,5 +1,4 @@
-import { x } from './helpers.js';
-import { post } from './helpers.js';
+import { x, post } from './helpers.js';
 import { focusNodes } from '../shared/focus-nodes.js';
 import { state } from './state.js';
 

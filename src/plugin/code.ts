@@ -1,7 +1,6 @@
 import { scanNode, resetNodesScannedCount } from './scanner';
 import { loadSnapshot, loadSnapshotMeta } from './snapshot';
 import { handleSnapshotMessage } from './snapshot-messages';
-import { SCAN_NODE_TYPES } from './scan-config';
 import { processMigratorResults, scanData } from './migrator/scanHandler';
 import { onGetLibraries } from './migrator/libraries';
 import { onMigrate } from './migrator/migrate';
@@ -9,6 +8,8 @@ import { onDetachNotFound } from './migrator/detach';
 import type { BindingLocation } from './migrator/types';
 import { send } from './migrator/utils';
 import { focusNodesByIds } from './focus-nodes';
+import { runLibrariesScan } from './libraries-scan/scan';
+import { loadFigmaToken, saveFigmaToken, tokenHint } from './figma-token';
 
 figma.showUI(__html__, { width: 450, height: 600, themeColors: true });
 
@@ -21,6 +22,8 @@ figma.showUI(__html__, { width: 450, height: 600, themeColors: true });
     count: meta?.count || 0,
     version: meta?.version,
     source: meta?.source,
+    pagesScanned: meta?.pagesScanned,
+    pagesTotal: meta?.pagesTotal,
     hasLocal: !!meta,
   });
 
@@ -36,22 +39,9 @@ async function runGlobalScan(type: string, roots: readonly SceneNode[]) {
     return;
   }
 
-  const t0 = Date.now();
-  console.log(`[Design Review] Запуск сканирования (${type})... Собираем узлы...`);
-
+  console.log(`[Design Review] Запуск сканирования (${type})...`);
   figma.skipInvisibleInstanceChildren = true;
-
-  let totalNodesToScan = 0;
-  for (const root of roots) {
-    totalNodesToScan++;
-    if ('findAllWithCriteria' in root) {
-      totalNodesToScan += (root as any).findAllWithCriteria({ types: SCAN_NODE_TYPES }).length;
-    }
-  }
-
-  console.log(`[Design Review] Узлы собраны за ${Date.now() - t0}мс. Всего узлов: ${totalNodesToScan}`);
-
-  figma.ui.postMessage({ type: 'scan-start', total: totalNodesToScan });
+  figma.ui.postMessage({ type: 'scan-start' });
 
   const results = {
     components: [] as any[],
@@ -82,7 +72,6 @@ async function runGlobalScan(type: string, roots: readonly SceneNode[]) {
   const counter = { n: 0 };
   const onProgress = (count: number) => {
     figma.ui.postMessage({ type: 'scan-progress', count });
-    send('SCAN_PROGRESS', { nodeCount: count, total: totalNodesToScan, elapsed: `${Date.now() - t1}ms` });
   };
 
   const migratorMap = new Map<string, BindingLocation[]>();
@@ -95,9 +84,16 @@ async function runGlobalScan(type: string, roots: readonly SceneNode[]) {
   const elapsed = Date.now() - t1;
   console.log(`[Design Review] Сканирование завершено за ${elapsed}мс. Проверено: ${counter.n}. Найдено ошибок: ${totalIssues}`);
 
-  const migratorResult = processMigratorResults(migratorMap, counter.n, t1);
+  const migratorResult = await processMigratorResults(migratorMap, counter.n);
 
-  figma.ui.postMessage({ type: 'scan-results', results, scannedCount: counter.n, totalIssues, migratorResult, elapsed: `${elapsed}ms` });
+  figma.ui.postMessage({
+    type: 'scan-results',
+    results,
+    scannedCount: counter.n,
+    totalIssues,
+    migratorResult,
+    elapsed: `${elapsed}ms`,
+  });
 }
 
 figma.ui.onmessage = async (msg) => {
@@ -135,6 +131,28 @@ figma.ui.onmessage = async (msg) => {
     await figma.clientStorage.setAsync('theme', msg.theme);
   }
 
+  if (msg.type === 'get-figma-token') {
+    const token = await loadFigmaToken();
+    figma.ui.postMessage({
+      type: 'figma-token-info',
+      hasToken: !!token,
+      hint: tokenHint(token),
+    });
+    return;
+  }
+
+  if (msg.type === 'save-figma-token') {
+    await saveFigmaToken(String(msg.token || ''));
+    const token = await loadFigmaToken();
+    figma.ui.postMessage({
+      type: 'figma-token-info',
+      hasToken: !!token,
+      hint: tokenHint(token),
+    });
+    figma.notify(token ? 'Токен сохранён' : 'Токен удалён');
+    return;
+  }
+
   try {
     if (msg.type === 'GET_LIBRARIES') {
       await onGetLibraries();
@@ -144,7 +162,7 @@ figma.ui.onmessage = async (msg) => {
       await onMigrate(scanData, msg.collectionKeys as string[], msg.dryRun);
     } else if (msg.type === 'DETACH_NOT_FOUND') {
       if (!scanData || scanData.size === 0) throw new Error('Сначала выполни сканирование.');
-      onDetachNotFound(scanData, msg.names as string[]);
+      await onDetachNotFound(scanData, msg.names as string[]);
     } else if (msg.type === 'SCAN') {
       const scope = msg.scope as string;
       const scanType = scope === 'selection' ? 'scan-selection' : 'scan-page';
@@ -152,7 +170,8 @@ figma.ui.onmessage = async (msg) => {
       if (scope === 'selection') {
         roots = figma.currentPage.selection as SceneNode[];
       } else if (scope === 'document') {
-        roots = [];
+        figma.ui.postMessage({ type: 'scan-loading-pages' });
+        await figma.loadAllPagesAsync();
         for (const page of figma.root.children) {
           roots.push(...(page.children as SceneNode[]));
         }
@@ -160,6 +179,19 @@ figma.ui.onmessage = async (msg) => {
         roots = figma.currentPage.children as SceneNode[];
       }
       await runGlobalScan(scanType, roots);
+    } else if (msg.type === 'LIB_SCAN') {
+      const roots = msg.scope === 'selection'
+        ? (figma.currentPage.selection as SceneNode[])
+        : (figma.currentPage.children as SceneNode[]);
+      if (!roots.length) {
+        figma.notify('Ничего не найдено для сканирования');
+        return;
+      }
+      figma.ui.postMessage({ type: 'scan-start' });
+      const result = await runLibrariesScan(roots, (count, total, label) => {
+        figma.ui.postMessage({ type: 'scan-progress', count, total, label });
+      });
+      figma.ui.postMessage({ type: 'lib-scan-results', result });
     }
   } catch (err) {
     send('ERROR', { message: err instanceof Error ? err.message : String(err) });

@@ -2,8 +2,8 @@ import { DetachResult, InternalUsage, BindingLocation } from './types';
 import { send } from './utils';
 import { hasFills, isGradient } from './helpers';
 
-function detachLocation(loc: BindingLocation): void {
-  const node = figma.getNodeById(loc.nodeId) as SceneNode | null;
+async function detachLocation(loc: BindingLocation): Promise<void> {
+  const node = (await figma.getNodeByIdAsync(loc.nodeId)) as SceneNode | null;
   if (!node) return;
 
   switch (loc.kind) {
@@ -59,26 +59,26 @@ function detachLocation(loc: BindingLocation): void {
   }
 }
 
-export function onDetachNotFound(
+export async function onDetachNotFound(
   scanData: Map<string, InternalUsage>,
   notFoundNames: string[]
-): void {
+): Promise<void> {
   if (!notFoundNames.length) {
     send('DETACH_COMPLETE', { result: { detached: 0, errors: [] } as DetachResult });
     return;
   }
 
   const nameSet = new Set(notFoundNames);
-  let detached  = 0;
+  let detached = 0;
   const errors: string[] = [];
 
   for (const [, usage] of scanData) {
     if (!nameSet.has(usage.variableName)) continue;
     for (const loc of usage.locations) {
       try {
-        detachLocation(loc);
+        await detachLocation(loc);
         detached++;
-      } catch (e) {
+      } catch {
         errors.push(`Detach failed: ${usage.variableName} → "${loc.nodeName}"`);
       }
     }

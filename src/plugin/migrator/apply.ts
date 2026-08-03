@@ -1,8 +1,8 @@
 import { BindingLocation } from './types';
 import { isGradient, hasFills } from './helpers';
 
-export function applyVariable(loc: BindingLocation, variable: Variable): void {
-  const node = figma.getNodeById(loc.nodeId) as SceneNode | null;
+export async function applyVariable(loc: BindingLocation, variable: Variable): Promise<void> {
+  const node = (await figma.getNodeByIdAsync(loc.nodeId)) as SceneNode | null;
   if (!node) return;
 
   switch (loc.kind) {

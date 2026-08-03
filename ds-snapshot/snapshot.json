@@ -1,7 +1,9 @@
 {
-  "version": "2026.07.30",
-  "u": "2026-07-30T13:17:08.511Z",
-  "f": "DS / Nine / UIkit",
+  "version": "2026.08.03",
+  "u": "2026-08-03T11:04:50.898Z",
+  "f": "",
+  "pagesScanned": 38,
+  "pagesTotal": 38,
   "c": [
     {
       "k": "423ad85f56990d72e08acb68716aaabb279b5c4a",
@@ -29639,14 +29641,6 @@
         "Rectangle 1": "f:#D9D9D9",
         "Vector": "f:#394046",
         "Rectangle 4295": "s:#394046|r:20"
-      }
-    },
-    {
-      "k": "2d422be81fcb41a6571c4e82d5c439cf7906e0a5",
-      "n": "front/components/wow/card-event-overlay-image",
-      "l": {
-        "Rectangle 1": "f:#D9D9D9",
-        "Vector": "f:#394046"
       }
     },
     {

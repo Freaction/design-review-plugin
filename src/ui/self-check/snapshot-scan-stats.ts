@@ -6,6 +6,13 @@ export function formatElapsed(ms) {
   return `${seconds}с`;
 }
 
+export function formatMetaSummary(meta) {
+  const comp = `${meta?.count || 0} комп.`;
+  if (meta?.pagesTotal == null) return comp;
+  const scanned = meta.pagesScanned ?? meta.pagesTotal;
+  return `${comp} · ${scanned}/${meta.pagesTotal} стр.`;
+}
+
 export function showScanProgress(msg) {
   const stats = document.getElementById('snapshot-scan-stats');
   const statsText = document.getElementById('snapshot-scan-stats-text');

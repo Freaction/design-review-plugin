@@ -1,11 +1,16 @@
 import { groupIssues } from '../shared/group-issues.js';
 import { focusNodes } from '../shared/focus-nodes.js';
+import { setScanStatsComplete } from '../shared/scan-stats.js';
+
+export {
+  setScanStart,
+  setScanLoadingPages,
+  setScanProgress,
+} from '../shared/scan-stats.js';
 
 const SEVERITY_ORDER: Record<string, number> = { error: 0, warning: 1, info: 2 };
 
 let latestRawResults: any = null;
-let scanStartTime = 0;
-let scanTotalNodes = 0;
 let currentSubTab = 'components';
 
 const DOT_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg>`;
@@ -28,32 +33,6 @@ export function initSelfCheckResults() {
   (window as any).focusIssueNodes = (idsCsv: string) => {
     focusNodes(String(idsCsv || '').split(',').filter(Boolean));
   };
-}
-
-export function setScanStart(total: number) {
-  scanTotalNodes = total;
-  scanStartTime = Date.now();
-  const statsEl = document.getElementById('stats');
-  if (!statsEl) return;
-  statsEl.style.display = 'flex';
-  document.getElementById('stats-time-text')!.innerText = `⏳ Подготовка... (Всего узлов: ${scanTotalNodes})`;
-  const iconEl = document.getElementById('stats-icon');
-  if (iconEl) iconEl.style.display = 'none';
-}
-
-export function setScanProgress(count: number) {
-  const statsEl = document.getElementById('stats');
-  if (!statsEl) return;
-  statsEl.style.display = 'flex';
-  const seconds = Math.floor((Date.now() - scanStartTime) / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const timeStr = minutes > 0 ? `${minutes}м ${seconds % 60}с` : `${seconds}с`;
-  let percent = scanTotalNodes > 0 ? Math.floor((count / scanTotalNodes) * 100) : 0;
-  if (percent > 100) percent = 100;
-  document.getElementById('stats-time-text')!.innerText =
-    `⏳ Сканирование... ${count} из ${scanTotalNodes} (${percent}%), прошло ${timeStr}`;
-  const iconEl = document.getElementById('stats-icon');
-  if (iconEl) iconEl.style.display = 'none';
 }
 
 export function onScanResults(resultsData: any) {
@@ -116,29 +95,12 @@ function renderResults(resultsData: any) {
     gradients: isGrouped ? groupIssues(resultsData.results.gradients, keyFn) : resultsData.results.gradients,
   };
 
-  const statsEl = document.getElementById('stats');
   const allIssues = [
     ...(processedResults.components || []),
     ...(processedResults.variables || []),
     ...(processedResults.gradients || []),
   ];
-  const totals = countBySeverity(allIssues);
-
-  if (statsEl) {
-    statsEl.style.display = 'flex';
-    const seconds = Math.floor((Date.now() - scanStartTime) / 1000);
-    document.getElementById('stats-time-text')!.textContent =
-      `Проверено ${resultsData.scannedCount} слоев за ${seconds}с`;
-    document.getElementById('stats-error')!.textContent = `${totals.error} блокер`;
-    document.getElementById('stats-warning')!.textContent = `${totals.warning} предупр.`;
-    document.getElementById('stats-info')!.textContent = `${totals.info} инфо`;
-    const iconEl = document.getElementById('stats-icon');
-    if (iconEl) {
-      iconEl.innerHTML =
-        '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.2 5.59998L6.42698 10.4L4.79999 8.76379" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      iconEl.style.display = 'flex';
-    }
-  }
+  setScanStatsComplete(resultsData.scannedCount, countBySeverity(allIssues));
 
   document.getElementById('count-components')!.textContent = String(processedResults.components?.length || 0);
   document.getElementById('count-variables')!.textContent = String(processedResults.variables?.length || 0);

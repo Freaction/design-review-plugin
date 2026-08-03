@@ -1,4 +1,5 @@
 import { compareVersions, fetchRemoteMeta, fetchRemoteSnapshot } from '../shared/snapshot-remote.js';
+import { showScanProgress, showScanStats, formatMetaSummary } from './snapshot-scan-stats';
 
 export { showScanProgress, showScanStats } from './snapshot-scan-stats';
 
@@ -41,9 +42,11 @@ function setScanStatus(text1, text2, tone) {
   }
 }
 
-function setUpdateBtnState() {
-  const updateBtn = document.getElementById('download-snapshot') as HTMLButtonElement | null;
-  if (updateBtn) updateBtn.disabled = status === 'current';
+function resetDownloadBtn() {
+  const btn = document.getElementById('download-snapshot') as HTMLButtonElement | null;
+  const label = document.getElementById('download-snapshot-text');
+  if (btn) btn.disabled = false;
+  if (label) label.textContent = 'Обновить эталон с GitHub';
 }
 
 function renderStatus() {
@@ -52,14 +55,13 @@ function renderStatus() {
   const remoteVersion = remoteMeta?.version || '';
 
   if (status === 'current') {
-    const label = `✅ Эталон актуален · v${localVersion || '—'} · ${localMeta?.count || 0} комп. · ${formatDate(localMeta?.updatedAt)}`;
+    const label = `✅ Эталон актуален · v${localVersion || '—'} · ${formatMetaSummary(localMeta)} · ${formatDate(localMeta?.updatedAt)}`;
     setMainStatus(label, 'ok');
     setScanStatus(label, '', 'ok');
     if (badge) {
       badge.textContent = 'Актуален';
       badge.className = 'snapshot-badge snapshot-badge-ok';
     }
-    setUpdateBtnState();
     return;
   }
 
@@ -73,12 +75,11 @@ function renderStatus() {
       badge.textContent = localMeta ? 'Устарел' : 'Не загружен';
       badge.className = 'snapshot-badge snapshot-badge-warn';
     }
-    setUpdateBtnState();
     return;
   }
 
   if (localMeta) {
-    const label = `✅ Эталон загружен · v${localVersion || '—'} · ${localMeta.count} комп. · ${formatDate(localMeta.updatedAt)}`;
+    const label = `✅ Эталон загружен · v${localVersion || '—'} · ${formatMetaSummary(localMeta)} · ${formatDate(localMeta.updatedAt)}`;
     const hint = remoteCheckError
       ? 'Не удалось проверить сервер — обновление всё равно доступно'
       : '';
@@ -88,7 +89,6 @@ function renderStatus() {
       badge.textContent = remoteMeta ? 'Локальный' : 'Не проверен';
       badge.className = 'snapshot-badge';
     }
-    setUpdateBtnState();
     return;
   }
 
@@ -98,7 +98,6 @@ function renderStatus() {
     badge.textContent = 'Нет эталона';
     badge.className = 'snapshot-badge snapshot-badge-error';
   }
-  setUpdateBtnState();
 }
 
 export function applyLocalMeta(meta) {
@@ -109,10 +108,14 @@ export function applyLocalMeta(meta) {
         count: meta.count,
         version: meta.version,
         source: meta.source,
+        pagesScanned: meta.pagesScanned,
+        pagesTotal: meta.pagesTotal,
+        elapsedMs: meta.elapsedMs,
       }
     : null;
   status = compareVersions(localMeta?.version, remoteMeta?.version);
   renderStatus();
+  if (localMeta?.pagesTotal != null) showScanStats(localMeta);
 }
 
 export async function checkRemoteVersion() {
@@ -133,26 +136,39 @@ export async function downloadAndSaveRemote() {
   const btn = document.getElementById('download-snapshot') as HTMLButtonElement | null;
   const label = document.getElementById('download-snapshot-text');
   if (btn) btn.disabled = true;
-  if (label) label.textContent = '⏳ Скачивание...';
+  if (label) label.textContent = '⏳ Проверка...';
 
   try {
+    remoteCheckError = '';
+    remoteMeta = await fetchRemoteMeta();
+    status = compareVersions(localMeta?.version, remoteMeta.version);
+
+    if (status === 'current') {
+      const msg = `✅ Эталон уже актуален · v${remoteMeta.version} · ${formatMetaSummary(localMeta)}`;
+      renderStatus();
+      setScanStatus(msg, '', 'ok');
+      setMainStatus(msg, 'ok');
+      return;
+    }
+
+    if (label) label.textContent = '⏳ Скачивание...';
     const storage = await fetchRemoteSnapshot();
-    parent.postMessage({ pluginMessage: { type: 'save-remote-snapshot', storage } }, '*');
+    parent.postMessage({
+      pluginMessage: { type: 'save-remote-snapshot', storage, remoteMeta },
+    }, '*');
   } catch (err) {
-    if (label) label.textContent = 'Обновить эталон с GitHub';
-    if (btn) btn.disabled = status !== 'current';
+    resetDownloadBtn();
     setScanStatus(err instanceof Error ? err.message : String(err), '', 'error');
     setMainStatus(err instanceof Error ? err.message : String(err), 'error');
+  } finally {
+    if (status === 'current') resetDownloadBtn();
   }
 }
 
 export function onRemoteSaved(meta) {
   applyLocalMeta(meta);
   remoteCheckError = '';
-  const btn = document.getElementById('download-snapshot') as HTMLButtonElement | null;
-  const label = document.getElementById('download-snapshot-text');
-  if (btn) btn.disabled = status === 'current';
-  if (label) label.textContent = 'Обновить эталон с GitHub';
+  resetDownloadBtn();
 }
 
 export function downloadJson(filename, data) {

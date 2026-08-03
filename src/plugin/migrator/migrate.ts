@@ -67,18 +67,15 @@ export async function onMigrate(
       }
       for (const loc of result.usage.locations) {
         try {
-          applyVariable(loc, result.newVar);
+          await applyVariable(loc, result.newVar);
           replaced++;
-        } catch (e) {
+        } catch {
           errors.push(`Apply failed: ${result.usage.variableName} → "${loc.nodeName}"`);
         }
       }
     }
 
-    const current = Math.min(i + BATCH, totalToMigrate);
-    send('MIGRATE_PROGRESS', { current, total: totalToMigrate, replaced, elapsed: ms(tTotal) });
-
-    if (current < totalToMigrate) {
+    if (i + BATCH < totalToMigrate) {
       await new Promise(r => setTimeout(r, 1));
     }
   }

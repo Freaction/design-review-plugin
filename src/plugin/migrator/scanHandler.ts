@@ -1,40 +1,30 @@
-import { Scope, ScanResult, VariableUsageInfo, InternalUsage, BindingLocation } from './types';
-import { perf, ms, send } from './utils';
+import { ScanResult, VariableUsageInfo, InternalUsage, BindingLocation } from './types';
+import { getCachedVariable } from '../cache';
 
 export let scanData: Map<string, InternalUsage> | null = null;
 
-export function setScanData(data: Map<string, InternalUsage>) {
-  scanData = data;
-}
-
-export function hydrateSync(rawMap: Map<string, BindingLocation[]>): Map<string, InternalUsage> {
+async function hydrate(rawMap: Map<string, BindingLocation[]>): Promise<Map<string, InternalUsage>> {
   const result = new Map<string, InternalUsage>();
-  const collectionCache = new Map<string, string>();
 
   for (const [variableId, locations] of rawMap.entries()) {
-    const variable = figma.variables.getVariableById(variableId);
+    const variable = await getCachedVariable(variableId);
     if (!variable) continue;
-
-    const colId = variable.variableCollectionId;
-    let colName = collectionCache.get(colId);
-    if (colName === undefined) {
-      const col = figma.variables.getVariableCollectionById(colId);
-      colName = col?.name ?? '(unknown)';
-      collectionCache.set(colId, colName);
-    }
 
     result.set(variableId, {
       variableId,
       variableName: variable.name,
-      collectionName: colName,
+      collectionName: variable.collectionName || '(unknown)',
       locations,
     });
   }
   return result;
 }
 
-export function processMigratorResults(rawMap: Map<string, BindingLocation[]>, totalNodes: number, tTotal: number): ScanResult {
-  scanData = hydrateSync(rawMap);
+export async function processMigratorResults(
+  rawMap: Map<string, BindingLocation[]>,
+  totalNodes: number,
+): Promise<ScanResult> {
+  scanData = await hydrate(rawMap);
   const variables: VariableUsageInfo[] = Array.from(scanData.values()).map(u => ({
     variableId: u.variableId,
     variableName: u.variableName,

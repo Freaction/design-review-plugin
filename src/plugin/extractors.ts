@@ -81,13 +81,3 @@ export function extractFont(node: SceneNode): string | undefined {
   if (font === figma.mixed) return 'mixed';
   return `${(font as FontName).family} ${(font as FontName).style}, ${node.fontSize}px`;
 }
-
-export function getNodePath(node: SceneNode, rootId: string): string {
-  let path = node.name;
-  let current = node.parent;
-  while (current && current.id !== rootId && current.type !== 'PAGE' && current.type !== 'DOCUMENT') {
-    path = current.name + '/' + path;
-    current = current.parent;
-  }
-  return path;
-}

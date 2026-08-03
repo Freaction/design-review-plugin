@@ -46,14 +46,9 @@ export function onScan(result) {
 
   lastScanResult = result;
 
-  $('migrator-stats-area').classList.remove('hidden');
   $('migrator-results-divider').classList.remove('hidden');
   $('panelResult').classList.remove('hidden');
 
-  $('migrator-nodes-count').textContent = result.nodeCount + ' нод';
-  $('migrator-vars-count').textContent = result.variables.length + ' переменных';
-
-  $('migrator-notfound-count').textContent = '0 не найдено';
   $('tab-notfound-count').textContent = '0';
   $('tab-allvars-count').textContent = result.variables.length;
 
@@ -138,7 +133,6 @@ export function onMigrate(msg) {
 
   state.currentNotFound = result.notFound || [];
 
-  $('migrator-notfound-count').textContent = state.currentNotFound.length + ' не найдено';
   $('tab-notfound-count').textContent = state.currentNotFound.length;
 
   currentTab = 'notfound';
@@ -166,7 +160,6 @@ export function onDetach(result) {
   } else if (!state.detachTarget) {
     state.currentNotFound = [];
   }
-  $('migrator-notfound-count').textContent = state.currentNotFound.length + ' не найдено';
   $('tab-notfound-count').textContent = state.currentNotFound.length;
   renderVarList();
 
@@ -174,5 +167,3 @@ export function onDetach(result) {
     toastOk(`Отвязано ${result.detached} стилей/переменных.`);
   }
 }
-
-export function renderNotFound() {}

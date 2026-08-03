@@ -62,13 +62,11 @@
     "src/ui/migrator/state.js"() {
       "use strict";
       state = {
-        scope: "selection",
         currentNotFound: (
           /** @type {string[]} */
           []
         ),
-        detachTarget: "",
-        scanTotal: 0
+        detachTarget: ""
       };
       colState = /* @__PURE__ */ new Map();
     }
@@ -114,8 +112,7 @@
   }
   function toastOk(msg) {
     const t = document.createElement("div");
-    t.className = "toast";
-    t.style.cssText = "background:#052e1c;border-color:#064e30;color:var(--ok)";
+    t.className = "toast toast-ok";
     t.textContent = "\u2713 " + msg;
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 3500);
@@ -136,7 +133,7 @@
     $("libList").parentElement.classList.remove("hidden");
     colState.clear();
     if (!collections.length) {
-      $("libList").innerHTML = '<div style="padding:12px;font-size:12px;color:rgba(0,0,0,0.4)">\u041D\u0435\u0442 \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A. \u0412\u043A\u043B\u044E\u0447\u0438\u0442\u0435 \u0438\u0445 \u0432 Assets -> Libraries.</div>';
+      $("libList").innerHTML = '<div class="lib-empty">\u041D\u0435\u0442 \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A. \u0412\u043A\u043B\u044E\u0447\u0438\u0442\u0435 \u0438\u0445 \u0432 Assets \u2192 Libraries.</div>';
       return;
     }
     for (const c of collections) {
@@ -158,15 +155,15 @@
       const allChecked = checkedCount === cols.length;
       const partial = checkedCount > 0 && !allChecked;
       const isExpanded = expandedLibs.has(libName);
+      const rotation = isExpanded ? "0deg" : "-90deg";
       const header = document.createElement("div");
       header.className = "lib-tree-header";
-      const rotation = isExpanded ? "0deg" : "-90deg";
       header.innerHTML = `
-      <div class="lib-chevron" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
-        <svg width="8" height="4" viewBox="0 0 8 4" fill="none" stroke="rgba(0,0,0,0.4)" stroke-width="1.2" style="transform: rotate(${rotation}); transition: transform 0.2s;"><path d="M1 1l3 2 3-2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="lib-chevron">
+        <svg width="8" height="4" viewBox="0 0 8 4" fill="none" stroke="currentColor" stroke-width="1.2" style="transform: rotate(${rotation}); transition: transform 0.2s;"><path d="M1 1l3 2 3-2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
       <div class="lib-check ${allChecked ? "checked" : partial ? "partial" : ""}"></div>
-      <div style="font-size: 12px; line-height: 16px; color: rgba(0,0,0,0.8);">${x(libName)}</div>
+      <div class="lib-tree-label">${x(libName)}</div>
     `;
       header.querySelector(".lib-chevron").addEventListener("click", (e) => {
         e.stopPropagation();
@@ -183,7 +180,7 @@
           row.dataset.key = col.key;
           row.innerHTML = `
           <div class="lib-check ${col.checked ? "checked" : ""}"></div>
-          <div style="font-size: 12px; color: rgba(0,0,0,0.8);">${x(col.colName)}</div>
+          <div class="lib-tree-label">${x(col.colName)}</div>
         `;
           row.addEventListener("click", () => toggleCol(col.key));
           list.appendChild(row);
@@ -302,7 +299,6 @@
     "src/ui/migrator/var-rows.js"() {
       "use strict";
       init_helpers();
-      init_helpers();
       init_focus_nodes();
       init_state();
       DOT_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg>`;
@@ -349,12 +345,8 @@
     setBtn("btnScanSelection", false);
     setBtn("btnScanPage", false);
     lastScanResult = result;
-    $("migrator-stats-area").classList.remove("hidden");
     $("migrator-results-divider").classList.remove("hidden");
     $("panelResult").classList.remove("hidden");
-    $("migrator-nodes-count").textContent = result.nodeCount + " \u043D\u043E\u0434";
-    $("migrator-vars-count").textContent = result.variables.length + " \u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0445";
-    $("migrator-notfound-count").textContent = "0 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E";
     $("tab-notfound-count").textContent = "0";
     $("tab-allvars-count").textContent = result.variables.length;
     currentTab = "allvars";
@@ -433,7 +425,6 @@
     $("migrator-results-divider").classList.remove("hidden");
     $("panelResult").classList.remove("hidden");
     state.currentNotFound = result.notFound || [];
-    $("migrator-notfound-count").textContent = state.currentNotFound.length + " \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E";
     $("tab-notfound-count").textContent = state.currentNotFound.length;
     currentTab = "notfound";
     updateTabs();
@@ -457,7 +448,6 @@
     } else if (!state.detachTarget) {
       state.currentNotFound = [];
     }
-    $("migrator-notfound-count").textContent = state.currentNotFound.length + " \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E";
     $("tab-notfound-count").textContent = state.currentNotFound.length;
     renderVarList();
     if (!result.errors.length) {
@@ -481,18 +471,14 @@
     var _a, _b;
     (_a = $("btnScanSelection")) == null ? void 0 : _a.addEventListener("click", () => {
       setBtn("btnScanSelection", true, '<div class="cta-inner-border"></div><span>\u0421\u043A\u0430\u043D...</span>');
-      $("migrator-stats-area").classList.add("hidden");
       $("migrator-results-divider").classList.add("hidden");
       $("panelResult").classList.add("hidden");
-      state.scanTotal = 0;
       post("SCAN", { scope: "selection" });
     });
     (_b = $("btnScanPage")) == null ? void 0 : _b.addEventListener("click", () => {
       setBtn("btnScanPage", true, '<div class="cta-inner-border"></div><span>\u0421\u043A\u0430\u043D...</span>');
-      $("migrator-stats-area").classList.add("hidden");
       $("migrator-results-divider").classList.add("hidden");
       $("panelResult").classList.add("hidden");
-      state.scanTotal = 0;
       post("SCAN", { scope: "page" });
     });
   }
@@ -519,7 +505,7 @@
       const orig = btn.innerHTML;
       const markCopied = () => {
         btn.innerHTML = "\u2713 \u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u043D\u043E";
-        btn.style.color = "var(--ok)";
+        btn.style.color = "var(--color-primary)";
         setTimeout(() => {
           btn.innerHTML = orig;
           btn.style.color = "";
@@ -553,39 +539,15 @@
   function handleMigratorMessage(msg) {
     if (!msg) return;
     switch (msg.type) {
-      case "SCAN_START": {
-        state.scanTotal = msg.total;
-        const el = $("scanProgress");
-        if (el) el.textContent = `\u041D\u0430\u0439\u0434\u0435\u043D\u043E ${msg.total.toLocaleString("ru")} \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u043E\u0432, \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435\u2026`;
-        break;
-      }
-      case "SCAN_PROGRESS": {
-        const el = $("scanProgress");
-        if (el) {
-          const pct = msg.total ? Math.round(msg.nodeCount / msg.total * 100) : 0;
-          const vars = msg.varCount ? ` \xB7 \u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0445: ${msg.varCount}` : "";
-          const time = msg.elapsed ? ` \xB7 ${msg.elapsed}` : "";
-          el.textContent = `${msg.nodeCount.toLocaleString("ru")} / ${msg.total.toLocaleString("ru")} (${pct}%)${vars}${time}`;
-        }
-        break;
-      }
       case "LIBRARIES_LOADED":
         onLibraries(msg.collections);
         break;
-      case "SCAN_COMPLETE": {
-        if (msg.elapsed) {
-          $("migrator-time-text").textContent = `\u041F\u0440\u043E\u0432\u0435\u0440\u0435\u043D\u043E ${msg.result.nodeCount} \u0441\u043B\u043E\u0435\u0432 \u0437\u0430 ${msg.elapsed}`;
-        }
+      case "SCAN_COMPLETE":
         onScan(msg.result);
         break;
-      }
-      case "MIGRATE_START": {
+      case "MIGRATE_START":
         toast(`\u041D\u0430\u0447\u0438\u043D\u0430\u0435\u043C \u0437\u0430\u043C\u0435\u043D\u0443 ${msg.total} \u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0445...`);
         break;
-      }
-      case "MIGRATE_PROGRESS": {
-        break;
-      }
       case "MIGRATE_COMPLETE":
         onMigrate(msg);
         break;
@@ -638,6 +600,94 @@
     }
   });
 
+  // src/ui/shared/scan-stats.js
+  function blocks() {
+    return document.querySelectorAll(".scan-stats");
+  }
+  function setVisible(root, visible) {
+    root.classList.toggle("hidden", !visible);
+    if (visible) root.style.display = "flex";
+    else root.style.display = "none";
+  }
+  function setTime(root, text) {
+    const el = root.querySelector(".scan-stats-time");
+    if (el) el.textContent = text;
+  }
+  function setIcon(root, show) {
+    const icon = root.querySelector(".scan-stats-icon");
+    if (!icon) return;
+    if (show) {
+      icon.innerHTML = CHECK_SVG;
+      icon.style.display = "flex";
+    } else {
+      icon.style.display = "none";
+    }
+  }
+  function formatElapsed(ms) {
+    const seconds = Math.floor(ms / 1e3);
+    const minutes = Math.floor(seconds / 60);
+    return minutes > 0 ? `${minutes}\u043C ${seconds % 60}\u0441` : `${seconds}\u0441`;
+  }
+  function setScanStart() {
+    scanStartTime = Date.now();
+    for (const root of blocks()) {
+      setVisible(root, true);
+      setTime(root, "\u23F3 \u041F\u043E\u0434\u0433\u043E\u0442\u043E\u0432\u043A\u0430...");
+      setIcon(root, false);
+      const error = root.querySelector(".scan-stats-error");
+      const warning = root.querySelector(".scan-stats-warning");
+      const info = root.querySelector(".scan-stats-info");
+      if (error) error.textContent = "0 \u0431\u043B\u043E\u043A\u0435\u0440";
+      if (warning) warning.textContent = "0 \u043F\u0440\u0435\u0434\u0443\u043F\u0440.";
+      if (info) info.textContent = "0 \u0438\u043D\u0444\u043E";
+    }
+  }
+  function setScanLoadingPages() {
+    for (const root of blocks()) {
+      setVisible(root, true);
+      setTime(root, "\u23F3 \u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446...");
+      setIcon(root, false);
+    }
+  }
+  function setScanProgress(count, total, label) {
+    const timeStr = formatElapsed(Date.now() - scanStartTime);
+    let text;
+    if (label) {
+      text = `\u23F3 ${label}, \u043F\u0440\u043E\u0448\u043B\u043E ${timeStr}`;
+    } else if (total) {
+      text = `\u23F3 \u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435... ${count} \u0438\u0437 ${total}, \u043F\u0440\u043E\u0448\u043B\u043E ${timeStr}`;
+    } else {
+      text = `\u23F3 \u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435... ${count} \u0443\u0437\u043B\u043E\u0432, \u043F\u0440\u043E\u0448\u043B\u043E ${timeStr}`;
+    }
+    for (const root of blocks()) {
+      setVisible(root, true);
+      setTime(root, text);
+      setIcon(root, false);
+    }
+  }
+  function setScanStatsComplete(scannedCount, totals) {
+    const seconds = Math.floor((Date.now() - scanStartTime) / 1e3);
+    for (const root of blocks()) {
+      setVisible(root, true);
+      setTime(root, `\u041F\u0440\u043E\u0432\u0435\u0440\u0435\u043D\u043E ${scannedCount} \u0441\u043B\u043E\u0435\u0432 \u0437\u0430 ${seconds}\u0441`);
+      const error = root.querySelector(".scan-stats-error");
+      const warning = root.querySelector(".scan-stats-warning");
+      const info = root.querySelector(".scan-stats-info");
+      if (error) error.textContent = `${totals.error} \u0431\u043B\u043E\u043A\u0435\u0440`;
+      if (warning) warning.textContent = `${totals.warning} \u043F\u0440\u0435\u0434\u0443\u043F\u0440.`;
+      if (info) info.textContent = `${totals.info} \u0438\u043D\u0444\u043E`;
+      setIcon(root, true);
+    }
+  }
+  var CHECK_SVG, scanStartTime;
+  var init_scan_stats = __esm({
+    "src/ui/shared/scan-stats.js"() {
+      "use strict";
+      CHECK_SVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.2 5.59998L6.42698 10.4L4.79999 8.76379" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      scanStartTime = 0;
+    }
+  });
+
   // src/ui/self-check/results.ts
   function initSelfCheckResults() {
     document.querySelectorAll("#page-main .sub-tab").forEach((tab) => {
@@ -655,29 +705,6 @@
     window.focusIssueNodes = (idsCsv) => {
       focusNodes(String(idsCsv || "").split(",").filter(Boolean));
     };
-  }
-  function setScanStart(total) {
-    scanTotalNodes = total;
-    scanStartTime = Date.now();
-    const statsEl = document.getElementById("stats");
-    if (!statsEl) return;
-    statsEl.style.display = "flex";
-    document.getElementById("stats-time-text").innerText = `\u23F3 \u041F\u043E\u0434\u0433\u043E\u0442\u043E\u0432\u043A\u0430... (\u0412\u0441\u0435\u0433\u043E \u0443\u0437\u043B\u043E\u0432: ${scanTotalNodes})`;
-    const iconEl = document.getElementById("stats-icon");
-    if (iconEl) iconEl.style.display = "none";
-  }
-  function setScanProgress(count) {
-    const statsEl = document.getElementById("stats");
-    if (!statsEl) return;
-    statsEl.style.display = "flex";
-    const seconds = Math.floor((Date.now() - scanStartTime) / 1e3);
-    const minutes = Math.floor(seconds / 60);
-    const timeStr = minutes > 0 ? `${minutes}\u043C ${seconds % 60}\u0441` : `${seconds}\u0441`;
-    let percent = scanTotalNodes > 0 ? Math.floor(count / scanTotalNodes * 100) : 0;
-    if (percent > 100) percent = 100;
-    document.getElementById("stats-time-text").innerText = `\u23F3 \u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435... ${count} \u0438\u0437 ${scanTotalNodes} (${percent}%), \u043F\u0440\u043E\u0448\u043B\u043E ${timeStr}`;
-    const iconEl = document.getElementById("stats-icon");
-    if (iconEl) iconEl.style.display = "none";
   }
   function onScanResults(resultsData) {
     latestRawResults = resultsData;
@@ -732,26 +759,12 @@
       variables: isGrouped2 ? groupIssues(resultsData.results.variables, keyFn) : resultsData.results.variables,
       gradients: isGrouped2 ? groupIssues(resultsData.results.gradients, keyFn) : resultsData.results.gradients
     };
-    const statsEl = document.getElementById("stats");
     const allIssues = [
       ...processedResults.components || [],
       ...processedResults.variables || [],
       ...processedResults.gradients || []
     ];
-    const totals = countBySeverity(allIssues);
-    if (statsEl) {
-      statsEl.style.display = "flex";
-      const seconds = Math.floor((Date.now() - scanStartTime) / 1e3);
-      document.getElementById("stats-time-text").textContent = `\u041F\u0440\u043E\u0432\u0435\u0440\u0435\u043D\u043E ${resultsData.scannedCount} \u0441\u043B\u043E\u0435\u0432 \u0437\u0430 ${seconds}\u0441`;
-      document.getElementById("stats-error").textContent = `${totals.error} \u0431\u043B\u043E\u043A\u0435\u0440`;
-      document.getElementById("stats-warning").textContent = `${totals.warning} \u043F\u0440\u0435\u0434\u0443\u043F\u0440.`;
-      document.getElementById("stats-info").textContent = `${totals.info} \u0438\u043D\u0444\u043E`;
-      const iconEl = document.getElementById("stats-icon");
-      if (iconEl) {
-        iconEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.2 5.59998L6.42698 10.4L4.79999 8.76379" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        iconEl.style.display = "flex";
-      }
-    }
+    setScanStatsComplete(resultsData.scannedCount, countBySeverity(allIssues));
     document.getElementById("count-components").textContent = String(((_a = processedResults.components) == null ? void 0 : _a.length) || 0);
     document.getElementById("count-variables").textContent = String(((_b = processedResults.variables) == null ? void 0 : _b.length) || 0);
     document.getElementById("count-gradients").textContent = String(((_c = processedResults.gradients) == null ? void 0 : _c.length) || 0);
@@ -765,16 +778,16 @@
     });
     updateEmptyState();
   }
-  var SEVERITY_ORDER, latestRawResults, scanStartTime, scanTotalNodes, currentSubTab, DOT_SVG2;
+  var SEVERITY_ORDER, latestRawResults, currentSubTab, DOT_SVG2;
   var init_results = __esm({
     "src/ui/self-check/results.ts"() {
       "use strict";
       init_group_issues();
       init_focus_nodes();
+      init_scan_stats();
+      init_scan_stats();
       SEVERITY_ORDER = { error: 0, warning: 1, info: 2 };
       latestRawResults = null;
-      scanStartTime = 0;
-      scanTotalNodes = 0;
       currentSubTab = "components";
       DOT_SVG2 = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg>`;
     }
@@ -823,19 +836,26 @@
   });
 
   // src/ui/self-check/snapshot-scan-stats.ts
-  function formatElapsed(ms) {
+  function formatElapsed2(ms) {
     const totalSec = Math.max(0, Math.floor((ms || 0) / 1e3));
     const minutes = Math.floor(totalSec / 60);
     const seconds = totalSec % 60;
     if (minutes > 0) return `${minutes}\u043C ${seconds}\u0441`;
     return `${seconds}\u0441`;
   }
+  function formatMetaSummary(meta) {
+    var _a;
+    const comp = `${(meta == null ? void 0 : meta.count) || 0} \u043A\u043E\u043C\u043F.`;
+    if ((meta == null ? void 0 : meta.pagesTotal) == null) return comp;
+    const scanned = (_a = meta.pagesScanned) != null ? _a : meta.pagesTotal;
+    return `${comp} \xB7 ${scanned}/${meta.pagesTotal} \u0441\u0442\u0440.`;
+  }
   function showScanProgress(msg) {
     const stats = document.getElementById("snapshot-scan-stats");
     const statsText = document.getElementById("snapshot-scan-stats-text");
     const text1 = document.getElementById("scan-status-text1");
     const text2 = document.getElementById("scan-status-text2");
-    const elapsed = formatElapsed(msg.elapsedMs);
+    const elapsed = formatElapsed2(msg.elapsedMs);
     const pagesPart = msg.pagesTotal ? `\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430 ${msg.pageIndex || 0}/${msg.pagesTotal}` : `\u0441\u0442\u0440. \xAB${msg.page}\xBB`;
     if (text1) {
       text1.textContent = `\u23F3 \u0421\u043A\u0430\u043D UI-Kit... ${pagesPart}, \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432: ${msg.processed || 0}, ${elapsed}`;
@@ -853,7 +873,7 @@
     if (!stats || !statsText) return;
     stats.classList.remove("hidden");
     const pages = meta.pagesTotal != null ? `${meta.pagesScanned || 0}/${meta.pagesTotal} \u0441\u0442\u0440.` : "\u2014";
-    statsText.textContent = `\u0413\u043E\u0442\u043E\u0432\u043E: ${meta.count || 0} \u043A\u043E\u043C\u043F. \xB7 ${pages} \xB7 ${formatElapsed(meta.elapsedMs)}`;
+    statsText.textContent = `\u0413\u043E\u0442\u043E\u0432\u043E: ${meta.count || 0} \u043A\u043E\u043C\u043F. \xB7 ${pages} \xB7 ${formatElapsed2(meta.elapsedMs)}`;
   }
   var init_snapshot_scan_stats = __esm({
     "src/ui/self-check/snapshot-scan-stats.ts"() {
@@ -893,23 +913,24 @@
       }
     }
   }
-  function setUpdateBtnState() {
-    const updateBtn = document.getElementById("download-snapshot");
-    if (updateBtn) updateBtn.disabled = status === "current";
+  function resetDownloadBtn() {
+    const btn = document.getElementById("download-snapshot");
+    const label = document.getElementById("download-snapshot-text");
+    if (btn) btn.disabled = false;
+    if (label) label.textContent = "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u044D\u0442\u0430\u043B\u043E\u043D \u0441 GitHub";
   }
   function renderStatus() {
     const badge = document.getElementById("snapshot-version-badge");
     const localVersion = (localMeta == null ? void 0 : localMeta.version) || "";
     const remoteVersion = (remoteMeta == null ? void 0 : remoteMeta.version) || "";
     if (status === "current") {
-      const label = `\u2705 \u042D\u0442\u0430\u043B\u043E\u043D \u0430\u043A\u0442\u0443\u0430\u043B\u0435\u043D \xB7 v${localVersion || "\u2014"} \xB7 ${(localMeta == null ? void 0 : localMeta.count) || 0} \u043A\u043E\u043C\u043F. \xB7 ${formatDate(localMeta == null ? void 0 : localMeta.updatedAt)}`;
+      const label = `\u2705 \u042D\u0442\u0430\u043B\u043E\u043D \u0430\u043A\u0442\u0443\u0430\u043B\u0435\u043D \xB7 v${localVersion || "\u2014"} \xB7 ${formatMetaSummary(localMeta)} \xB7 ${formatDate(localMeta == null ? void 0 : localMeta.updatedAt)}`;
       setMainStatus(label, "ok");
       setScanStatus(label, "", "ok");
       if (badge) {
         badge.textContent = "\u0410\u043A\u0442\u0443\u0430\u043B\u0435\u043D";
         badge.className = "snapshot-badge snapshot-badge-ok";
       }
-      setUpdateBtnState();
       return;
     }
     if (status === "outdated") {
@@ -920,11 +941,10 @@
         badge.textContent = localMeta ? "\u0423\u0441\u0442\u0430\u0440\u0435\u043B" : "\u041D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D";
         badge.className = "snapshot-badge snapshot-badge-warn";
       }
-      setUpdateBtnState();
       return;
     }
     if (localMeta) {
-      const label = `\u2705 \u042D\u0442\u0430\u043B\u043E\u043D \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \xB7 v${localVersion || "\u2014"} \xB7 ${localMeta.count} \u043A\u043E\u043C\u043F. \xB7 ${formatDate(localMeta.updatedAt)}`;
+      const label = `\u2705 \u042D\u0442\u0430\u043B\u043E\u043D \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \xB7 v${localVersion || "\u2014"} \xB7 ${formatMetaSummary(localMeta)} \xB7 ${formatDate(localMeta.updatedAt)}`;
       const hint = remoteCheckError ? "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C \u0441\u0435\u0440\u0432\u0435\u0440 \u2014 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u0432\u0441\u0451 \u0440\u0430\u0432\u043D\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E" : "";
       setMainStatus(label, "ok");
       setScanStatus(label, hint, "ok");
@@ -932,7 +952,6 @@
         badge.textContent = remoteMeta ? "\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0439" : "\u041D\u0435 \u043F\u0440\u043E\u0432\u0435\u0440\u0435\u043D";
         badge.className = "snapshot-badge";
       }
-      setUpdateBtnState();
       return;
     }
     setMainStatus("\u042D\u0442\u0430\u043B\u043E\u043D \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \u2014 \u043E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441 GitHub", "error");
@@ -941,7 +960,6 @@
       badge.textContent = "\u041D\u0435\u0442 \u044D\u0442\u0430\u043B\u043E\u043D\u0430";
       badge.className = "snapshot-badge snapshot-badge-error";
     }
-    setUpdateBtnState();
   }
   function applyLocalMeta(meta) {
     localMeta = meta ? {
@@ -949,10 +967,14 @@
       fileKey: meta.fileKey,
       count: meta.count,
       version: meta.version,
-      source: meta.source
+      source: meta.source,
+      pagesScanned: meta.pagesScanned,
+      pagesTotal: meta.pagesTotal,
+      elapsedMs: meta.elapsedMs
     } : null;
     status = compareVersions(localMeta == null ? void 0 : localMeta.version, remoteMeta == null ? void 0 : remoteMeta.version);
     renderStatus();
+    if ((localMeta == null ? void 0 : localMeta.pagesTotal) != null) showScanStats(localMeta);
   }
   function checkRemoteVersion() {
     return __async(this, null, function* () {
@@ -974,25 +996,36 @@
       const btn = document.getElementById("download-snapshot");
       const label = document.getElementById("download-snapshot-text");
       if (btn) btn.disabled = true;
-      if (label) label.textContent = "\u23F3 \u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435...";
+      if (label) label.textContent = "\u23F3 \u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430...";
       try {
+        remoteCheckError = "";
+        remoteMeta = yield fetchRemoteMeta();
+        status = compareVersions(localMeta == null ? void 0 : localMeta.version, remoteMeta.version);
+        if (status === "current") {
+          const msg = `\u2705 \u042D\u0442\u0430\u043B\u043E\u043D \u0443\u0436\u0435 \u0430\u043A\u0442\u0443\u0430\u043B\u0435\u043D \xB7 v${remoteMeta.version} \xB7 ${formatMetaSummary(localMeta)}`;
+          renderStatus();
+          setScanStatus(msg, "", "ok");
+          setMainStatus(msg, "ok");
+          return;
+        }
+        if (label) label.textContent = "\u23F3 \u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435...";
         const storage = yield fetchRemoteSnapshot();
-        parent.postMessage({ pluginMessage: { type: "save-remote-snapshot", storage } }, "*");
+        parent.postMessage({
+          pluginMessage: { type: "save-remote-snapshot", storage, remoteMeta }
+        }, "*");
       } catch (err) {
-        if (label) label.textContent = "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u044D\u0442\u0430\u043B\u043E\u043D \u0441 GitHub";
-        if (btn) btn.disabled = status !== "current";
+        resetDownloadBtn();
         setScanStatus(err instanceof Error ? err.message : String(err), "", "error");
         setMainStatus(err instanceof Error ? err.message : String(err), "error");
+      } finally {
+        if (status === "current") resetDownloadBtn();
       }
     });
   }
   function onRemoteSaved(meta) {
     applyLocalMeta(meta);
     remoteCheckError = "";
-    const btn = document.getElementById("download-snapshot");
-    const label = document.getElementById("download-snapshot-text");
-    if (btn) btn.disabled = status === "current";
-    if (label) label.textContent = "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u044D\u0442\u0430\u043B\u043E\u043D \u0441 GitHub";
+    resetDownloadBtn();
   }
   function downloadJson(filename, data) {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -1018,10 +1051,286 @@
       "use strict";
       init_snapshot_remote();
       init_snapshot_scan_stats();
+      init_snapshot_scan_stats();
       localMeta = null;
       remoteMeta = null;
       status = "unknown";
       remoteCheckError = "";
+    }
+  });
+
+  // src/ui/libraries/state.js
+  var libState;
+  var init_state2 = __esm({
+    "src/ui/libraries/state.js"() {
+      "use strict";
+      libState = {
+        result: null,
+        checked: /* @__PURE__ */ new Set(),
+        expanded: /* @__PURE__ */ new Set(["foreign", "broken"]),
+        grouped: true
+      };
+    }
+  });
+
+  // src/ui/libraries/tree-ui.js
+  function totalSelected() {
+    if (!libState.result) return 0;
+    let n = 0;
+    for (const cat of libState.result.categories) {
+      for (const c of cat.components) {
+        if (libState.checked.has(`${cat.id}:${c.key}`)) n += c.count;
+      }
+    }
+    return n;
+  }
+  function renderLibTree() {
+    const list = $("libUsageList");
+    if (!list || !libState.result) return;
+    list.innerHTML = "";
+    if (!libState.result.categories.length) {
+      list.innerHTML = '<div class="lib-empty">Remote-\u0438\u043D\u0441\u0442\u0430\u043D\u0441\u044B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B</div>';
+      return;
+    }
+    for (const cat of libState.result.categories) {
+      const catKeys = cat.components.map((c) => `${cat.id}:${c.key}`);
+      const checkedCount = catKeys.filter((k) => libState.checked.has(k)).length;
+      const allChecked = checkedCount === catKeys.length && catKeys.length > 0;
+      const partial = checkedCount > 0 && !allChecked;
+      const isExpanded = libState.expanded.has(cat.id);
+      const rotation = isExpanded ? "0deg" : "-90deg";
+      const catCount = cat.components.reduce((n, c) => n + c.count, 0);
+      const header = document.createElement("div");
+      header.className = "lib-tree-header";
+      header.innerHTML = `
+      <div class="lib-chevron">
+        <svg width="8" height="4" viewBox="0 0 8 4" fill="none" stroke="currentColor" stroke-width="1.2" style="transform: rotate(${rotation}); transition: transform 0.2s;"><path d="M1 1l3 2 3-2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="lib-check ${allChecked ? "checked" : partial ? "partial" : ""}"></div>
+      <div class="lib-tree-label">${x(cat.title)} \xB7 ${catCount}</div>
+    `;
+      header.querySelector(".lib-chevron").addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (isExpanded) libState.expanded.delete(cat.id);
+        else libState.expanded.add(cat.id);
+        renderLibTree();
+      });
+      header.addEventListener("click", () => {
+        for (const k of catKeys) {
+          if (allChecked) libState.checked.delete(k);
+          else libState.checked.add(k);
+        }
+        renderLibTree();
+        window.dispatchEvent(new CustomEvent("lib-selection-changed"));
+      });
+      list.appendChild(header);
+      if (isExpanded) {
+        for (const c of cat.components) {
+          const id = `${cat.id}:${c.key}`;
+          const row = document.createElement("div");
+          row.className = "lib-tree-item";
+          row.innerHTML = `
+          <div class="lib-check ${libState.checked.has(id) ? "checked" : ""}"></div>
+          <div class="lib-tree-label">${x(c.name)} \xB7 ${c.count}</div>
+        `;
+          row.addEventListener("click", () => {
+            if (libState.checked.has(id)) libState.checked.delete(id);
+            else libState.checked.add(id);
+            renderLibTree();
+            window.dispatchEvent(new CustomEvent("lib-selection-changed"));
+          });
+          list.appendChild(row);
+        }
+      }
+    }
+    const hint = $("libUsageHint");
+    if (hint) {
+      hint.textContent = `\u0412\u044B\u0431\u0440\u0430\u043D\u043E remote: ${totalSelected()} / ${libState.result.remoteCount}`;
+    }
+  }
+  var init_tree_ui = __esm({
+    "src/ui/libraries/tree-ui.js"() {
+      "use strict";
+      init_state2();
+      init_helpers();
+    }
+  });
+
+  // src/ui/libraries/results-ui.js
+  function selectedItems() {
+    if (!libState.result) return [];
+    const items = [];
+    for (const cat of libState.result.categories) {
+      for (const c of cat.components) {
+        if (!libState.checked.has(`${cat.id}:${c.key}`)) continue;
+        for (const nodeId of c.nodeIds) {
+          items.push({
+            nodeId,
+            name: c.name,
+            category: cat.id,
+            errorType: c.name
+          });
+        }
+      }
+    }
+    return items;
+  }
+  function appendRow(list, { color, title, meta, nodeIds, count }) {
+    const d = document.createElement("div");
+    d.className = "var-item-new";
+    d.onclick = () => focusNodes(nodeIds);
+    const countHtml = count > 1 ? `<div class="var-item-actions"><span class="var-item-count">${count}</span></div>` : "";
+    d.innerHTML = `
+    <div class="var-item-row">
+      <div class="var-item-dot"><div class="dot-icon" style="color:${color}">${DOT_SVG3}</div></div>
+      <div class="var-item-title">
+        ${title}${meta ? ` <span class="var-item-meta">${meta}</span>` : ""}
+      </div>
+      ${countHtml}
+    </div>
+  `;
+    list.appendChild(d);
+  }
+  function renderLibResults() {
+    var _a;
+    const list = $("libUsageResults");
+    const panel = $("libUsagePanel");
+    if (!list || !panel) return;
+    const items = selectedItems();
+    if (!libState.result) {
+      panel.classList.add("hidden");
+      return;
+    }
+    panel.classList.remove("hidden");
+    list.innerHTML = "";
+    if (!items.length) {
+      list.innerHTML = '<div class="var-list-empty">\u041E\u0442\u043C\u0435\u0442\u044C\u0442\u0435 \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u044B \u0432 \u0441\u043F\u0438\u0441\u043A\u0435 \u0441\u043B\u0435\u0432\u0430</div>';
+      return;
+    }
+    const grouped = libState.grouped ? groupIssues(items, (item) => `${item.category}:${item.name}`) : items;
+    for (const item of grouped) {
+      const nodeIds = ((_a = item.nodeIds) == null ? void 0 : _a.length) ? item.nodeIds : item.nodeId ? [item.nodeId] : [];
+      appendRow(list, {
+        color: COLORS[item.category] || COLORS.foreign,
+        title: x(item.name),
+        meta: item.count > 1 ? `${item.count}\u0445` : "",
+        nodeIds,
+        count: item.count || 1
+      });
+    }
+  }
+  function initLibResults() {
+    var _a;
+    (_a = $("group-lib-switch")) == null ? void 0 : _a.addEventListener("change", (e) => {
+      libState.grouped = !!e.target.checked;
+      renderLibResults();
+    });
+    window.addEventListener("lib-selection-changed", renderLibResults);
+  }
+  var DOT_SVG3, COLORS;
+  var init_results_ui2 = __esm({
+    "src/ui/libraries/results-ui.js"() {
+      "use strict";
+      init_state2();
+      init_helpers();
+      init_group_issues();
+      init_focus_nodes();
+      DOT_SVG3 = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg>`;
+      COLORS = {
+        etalon: "#0ADB29",
+        foreign: "#F59E0B",
+        broken: "#FB3748"
+      };
+    }
+  });
+
+  // src/ui/libraries/handlers.js
+  function initLibrariesTab() {
+    var _a, _b;
+    initLibResults();
+    (_a = $("btnLibScanSelection")) == null ? void 0 : _a.addEventListener("click", () => {
+      var _a2;
+      setBtn("btnLibScanSelection", true, '<div class="cta-inner-border"></div><span>\u0421\u043A\u0430\u043D...</span>');
+      (_a2 = $("libUsagePanel")) == null ? void 0 : _a2.classList.add("hidden");
+      post("LIB_SCAN", { scope: "selection" });
+    });
+    (_b = $("btnLibScanPage")) == null ? void 0 : _b.addEventListener("click", () => {
+      var _a2;
+      setBtn("btnLibScanPage", true, '<div class="cta-inner-border"></div><span>\u0421\u043A\u0430\u043D...</span>');
+      (_a2 = $("libUsagePanel")) == null ? void 0 : _a2.classList.add("hidden");
+      post("LIB_SCAN", { scope: "page" });
+    });
+  }
+  function handleLibrariesMessage(msg) {
+    var _a;
+    if (!msg || msg.type !== "lib-scan-results") return false;
+    setBtn("btnLibScanSelection", false);
+    setBtn("btnLibScanPage", false);
+    libState.result = msg.result;
+    libState.checked = /* @__PURE__ */ new Set();
+    libState.expanded = /* @__PURE__ */ new Set();
+    for (const cat of msg.result.categories) {
+      if (cat.id === "etalon") continue;
+      libState.expanded.add(cat.id);
+      for (const c of cat.components) libState.checked.add(`${cat.id}:${c.key}`);
+    }
+    const r = msg.result;
+    setScanStatsComplete(r.instanceTotal, { error: 0, warning: 0, info: 0 });
+    const timeEls = document.querySelectorAll("#page-libraries .scan-stats-time");
+    for (const el of timeEls) {
+      const mode = r.usedRest ? "\u043F\u043E \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0430\u043C" : "\u044D\u0442\u0430\u043B\u043E\u043D / \u0432\u043D\u0435 \u044D\u0442\u0430\u043B\u043E\u043D\u0430";
+      el.textContent = `\u0418\u043D\u0441\u0442\u0430\u043D\u0441\u043E\u0432: ${r.instanceTotal} \xB7 remote: ${r.remoteCount} \xB7 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0445: ${r.localCount} \xB7 ${mode}`;
+    }
+    (_a = $("libUsageSection")) == null ? void 0 : _a.classList.remove("hidden");
+    renderLibTree();
+    renderLibResults();
+    return true;
+  }
+  var init_handlers2 = __esm({
+    "src/ui/libraries/handlers.js"() {
+      "use strict";
+      init_state2();
+      init_helpers();
+      init_tree_ui();
+      init_results_ui2();
+      init_scan_stats();
+    }
+  });
+
+  // src/ui/self-check/figma-token-ui.ts
+  function applyTokenStatus(msg) {
+    const status2 = document.getElementById("figma-token-status");
+    const input = document.getElementById("figma-token-input");
+    if (!status2) return;
+    if (msg == null ? void 0 : msg.hasToken) {
+      status2.textContent = `\u0421\u043E\u0445\u0440\u0430\u043D\u0451\u043D ${msg.hint || ""}`.trim();
+      status2.className = "status-text status-ok";
+      if (input) input.placeholder = "\u0422\u043E\u043A\u0435\u043D \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D \u2014 \u0432\u0441\u0442\u0430\u0432\u044C \u043D\u043E\u0432\u044B\u0439, \u0447\u0442\u043E\u0431\u044B \u0437\u0430\u043C\u0435\u043D\u0438\u0442\u044C";
+    } else {
+      status2.textContent = "\u041D\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D \u2014 \u0431\u0435\u0437 \u0442\u043E\u043A\u0435\u043D\u0430 \u0433\u0440\u0443\u043F\u043F\u044B: \u044D\u0442\u0430\u043B\u043E\u043D / \u043D\u0435 \u0432 \u044D\u0442\u0430\u043B\u043E\u043D\u0435";
+      status2.className = "status-text status-warn";
+      if (input) input.placeholder = "figd_\u2026";
+    }
+  }
+  function initFigmaTokenUi() {
+    var _a, _b;
+    (_a = document.getElementById("save-figma-token")) == null ? void 0 : _a.addEventListener("click", () => {
+      var _a2;
+      const input = document.getElementById("figma-token-input");
+      const token = ((_a2 = input == null ? void 0 : input.value) == null ? void 0 : _a2.trim()) || "";
+      parent.postMessage({ pluginMessage: { type: "save-figma-token", token } }, "*");
+      if (input) input.value = "";
+    });
+    (_b = document.getElementById("clear-figma-token")) == null ? void 0 : _b.addEventListener("click", () => {
+      parent.postMessage({ pluginMessage: { type: "save-figma-token", token: "" } }, "*");
+      const input = document.getElementById("figma-token-input");
+      if (input) input.value = "";
+    });
+    parent.postMessage({ pluginMessage: { type: "get-figma-token" } }, "*");
+  }
+  var init_figma_token_ui = __esm({
+    "src/ui/self-check/figma-token-ui.ts"() {
+      "use strict";
     }
   });
 
@@ -1032,6 +1341,8 @@
       init_results_ui();
       init_results();
       init_snapshot_status();
+      init_handlers2();
+      init_figma_token_ui();
       initScanButton();
       initMigrateButton();
       initCopyButton();
@@ -1040,6 +1351,8 @@
       initGroupSwitch();
       initSelfCheckResults();
       initSnapshotUi();
+      initLibrariesTab();
+      initFigmaTokenUi();
       parent.postMessage({ pluginMessage: { type: "GET_LIBRARIES" } }, "*");
       var themeBtn = document.getElementById("toggle-theme");
       var sunSVG = '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 2V3M8 13V14M2 8H3M13 8H14M3.76 3.76L4.47 4.47M11.53 11.53L12.24 12.24M12.24 3.76L11.53 4.47M4.47 11.53L3.76 12.24" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>';
@@ -1074,10 +1387,11 @@
       var expandSVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.76502 1.60001H14.3995M14.3995 1.60001V6.23449M14.3995 1.60001L8.9926 7.00691M6.23483 14.4H1.60034M1.60034 14.4V9.76552M1.60034 14.4L7.00724 8.99311" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       var collapseSVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.00724 13.6275L7.00724 8.99304L2.37276 8.99304M7.00724 8.99304L1.60034 14.3999M8.99253 2.37248V7.00697L13.627 7.00697M8.99253 7.00697L14.3994 1.60007" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       sizeBtn.onclick = () => {
-        var _a2;
+        var _a2, _b;
         isExpanded = !isExpanded;
         sizeBtn.innerHTML = isExpanded ? collapseSVG : expandSVG;
         (_a2 = document.getElementById("page-migrator")) == null ? void 0 : _a2.classList.toggle("expanded", isExpanded);
+        (_b = document.getElementById("page-libraries")) == null ? void 0 : _b.classList.toggle("expanded", isExpanded);
         parent.postMessage({ pluginMessage: { type: "resize", expanded: isExpanded } }, "*");
       };
       document.getElementById("scan-selection").onclick = () => {
@@ -1100,7 +1414,11 @@
           isDarkTheme = pluginMessage.theme === "dark";
           applyTheme();
         }
+        if (pluginMessage.type === "figma-token-info") {
+          applyTokenStatus(pluginMessage);
+        }
         handleMigratorMessage(pluginMessage);
+        handleLibrariesMessage(pluginMessage);
         if (pluginMessage.type === "snapshot-progress") {
           showScanProgress(pluginMessage);
         }
@@ -1156,14 +1474,19 @@
             version: pluginMessage.meta.version,
             u: pluginMessage.storage.u,
             f: pluginMessage.storage.f,
+            pagesScanned: pluginMessage.meta.pagesScanned,
+            pagesTotal: pluginMessage.meta.pagesTotal,
             c: pluginMessage.storage.c
           });
         }
         if (pluginMessage.type === "scan-start") {
-          setScanStart(pluginMessage.total);
+          setScanStart();
+        }
+        if (pluginMessage.type === "scan-loading-pages") {
+          setScanLoadingPages();
         }
         if (pluginMessage.type === "scan-progress") {
-          setScanProgress(pluginMessage.count);
+          setScanProgress(pluginMessage.count, pluginMessage.total, pluginMessage.label);
         }
         if (pluginMessage.type === "scan-results") {
           onScanResults(pluginMessage);

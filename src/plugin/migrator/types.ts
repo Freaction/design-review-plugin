@@ -1,5 +1,3 @@
-export type Scope = 'selection' | 'page' | 'document';
-
 export interface VariableLocationInfo {
   nodeId: string;
   nodeName: string;
