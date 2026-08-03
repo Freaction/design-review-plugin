@@ -1,3 +1,6 @@
+import { resolveEtalonFileKey } from './resolve-etalon-file-key';
+import { buildLayerTree } from './snapshot-layers';
+
 const STORAGE_KEY = 'ds_component_snapshot';
 const STORAGE_KEY_META = 'ds_component_snapshot_meta';
 
@@ -28,43 +31,6 @@ export interface SnapshotMeta {
   pagesScanned?: number;
   pagesTotal?: number;
   elapsedMs?: number;
-}
-
-import {
-  extractFills, extractStrokes, extractRadius, extractPadding,
-  extractItemSpacing, extractFont
-} from './extractors';
-
-async function buildLayerTree(node: SceneNode, layers: Record<string, string>) {
-  const parts: string[] = [];
-
-  const fills = await extractFills(node);
-  if (fills) parts.push(`f:${fills}`);
-
-  const strokes = await extractStrokes(node);
-  if (strokes) parts.push(`s:${strokes}`);
-
-  const radius = extractRadius(node);
-  if (radius) parts.push(`r:${radius}`);
-
-  const padding = extractPadding(node);
-  if (padding) parts.push(`p:${padding}`);
-
-  const itemSpacing = extractItemSpacing(node);
-  if (itemSpacing) parts.push(`i:${itemSpacing}`);
-
-  const font = extractFont(node);
-  if (font) parts.push(`t:${font}`);
-
-  if (parts.length > 0) {
-    layers[node.name] = parts.join('|');
-  }
-
-  if ('children' in node) {
-    for (const child of node.children) {
-      await buildLayerTree(child, layers);
-    }
-  }
 }
 
 function buildMeta(storage: SnapshotStorage, source: 'local' | 'remote'): SnapshotMeta {
@@ -160,17 +126,21 @@ export async function saveSnapshot(version?: string): Promise<SnapshotMeta> {
   }
 
   const elapsedMs = Date.now() - t0;
+  const sampleKeys = components.slice(0, 8).map(c => c.k);
+  const fileKey = (await resolveEtalonFileKey(figma.fileKey, sampleKeys)) || '';
   const storage: SnapshotStorage = {
     c: components,
     u: new Date().toISOString(),
-    f: figma.fileKey || '',
+    f: fileKey,
     fn: figma.root.name,
     version: version || new Date().toISOString().slice(0, 10).replace(/-/g, '.'),
     pagesScanned,
     pagesTotal,
   };
 
-  console.log(`[DS Snapshot] Полная замена эталона: ${components.length} компонентов, ${pagesScanned}/${pagesTotal} стр.`);
+  console.log(
+    `[DS Snapshot] Эталон: ${components.length} комп., ${pagesScanned}/${pagesTotal} стр., fileKey=${fileKey || '—'}`,
+  );
   return persist(storage, 'local', { pagesScanned, pagesTotal, elapsedMs });
 }
 

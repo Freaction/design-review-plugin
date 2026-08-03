@@ -1,4 +1,9 @@
 import { compareVersions, fetchRemoteMeta, fetchRemoteSnapshot } from '../shared/snapshot-remote.js';
+import {
+  onDownloadProgress,
+  resetDownloadBtn,
+  setDownloadUi,
+} from '../shared/snapshot-download-ui.js';
 import { showScanProgress, showScanStats, formatMetaSummary } from './snapshot-scan-stats';
 
 export { showScanProgress, showScanStats } from './snapshot-scan-stats';
@@ -42,13 +47,6 @@ function setScanStatus(text1, text2, tone) {
   }
 }
 
-function resetDownloadBtn() {
-  const btn = document.getElementById('download-snapshot') as HTMLButtonElement | null;
-  const label = document.getElementById('download-snapshot-text');
-  if (btn) btn.disabled = false;
-  if (label) label.textContent = 'Обновить эталон с GitHub';
-}
-
 function renderStatus() {
   const badge = document.getElementById('snapshot-version-badge');
   const localVersion = localMeta?.version || '';
@@ -60,6 +58,17 @@ function renderStatus() {
     setScanStatus(label, '', 'ok');
     if (badge) {
       badge.textContent = 'Актуален';
+      badge.className = 'snapshot-badge snapshot-badge-ok';
+    }
+    return;
+  }
+
+  if (status === 'ahead') {
+    const label = `ℹ️ Локально новее · v${localVersion}, на сервере устарела v${remoteVersion}`;
+    setMainStatus(label, 'ok');
+    setScanStatus(label, 'Экспортируйте JSON и обновите GitHub', 'ok');
+    if (badge) {
+      badge.textContent = 'Локально новее';
       badge.className = 'snapshot-badge snapshot-badge-ok';
     }
     return;
@@ -133,26 +142,24 @@ export async function checkRemoteVersion() {
 }
 
 export async function downloadAndSaveRemote() {
-  const btn = document.getElementById('download-snapshot') as HTMLButtonElement | null;
-  const label = document.getElementById('download-snapshot-text');
-  if (btn) btn.disabled = true;
-  if (label) label.textContent = '⏳ Проверка...';
+  setDownloadUi('Проверка версии на GitHub...');
 
   try {
     remoteCheckError = '';
     remoteMeta = await fetchRemoteMeta();
     status = compareVersions(localMeta?.version, remoteMeta.version);
 
-    if (status === 'current') {
-      const msg = `✅ Эталон уже актуален · v${remoteMeta.version} · ${formatMetaSummary(localMeta)}`;
+    if (status === 'current' || status === 'ahead') {
       renderStatus();
-      setScanStatus(msg, '', 'ok');
-      setMainStatus(msg, 'ok');
+      resetDownloadBtn();
       return;
     }
 
-    if (label) label.textContent = '⏳ Скачивание...';
-    const storage = await fetchRemoteSnapshot();
+    setDownloadUi(`Скачивание v${remoteMeta.version}...`);
+    const storage = await fetchRemoteSnapshot(onDownloadProgress);
+    setDownloadUi(
+      `Сохранение · ${remoteMeta.count || storage.c?.length || 0} комп. v${remoteMeta.version}`,
+    );
     parent.postMessage({
       pluginMessage: { type: 'save-remote-snapshot', storage, remoteMeta },
     }, '*');
@@ -160,8 +167,6 @@ export async function downloadAndSaveRemote() {
     resetDownloadBtn();
     setScanStatus(err instanceof Error ? err.message : String(err), '', 'error');
     setMainStatus(err instanceof Error ? err.message : String(err), 'error');
-  } finally {
-    if (status === 'current') resetDownloadBtn();
   }
 }
 

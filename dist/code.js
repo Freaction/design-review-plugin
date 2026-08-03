@@ -1319,7 +1319,139 @@
     }
   });
 
-  // src/plugin/snapshot.ts
+  // src/plugin/figma-file-key.ts
+  function isFigmaFileKey(value) {
+    if (!value || typeof value !== "string") return false;
+    if (/[\s/\\?#]/.test(value)) return false;
+    return /^[a-zA-Z0-9]{10,}$/.test(value);
+  }
+  function pickFileKey(...values) {
+    for (const value of values) {
+      if (isFigmaFileKey(value)) return value;
+    }
+    return void 0;
+  }
+  var init_figma_file_key = __esm({
+    "src/plugin/figma-file-key.ts"() {
+      "use strict";
+    }
+  });
+
+  // src/plugin/figma-token.ts
+  function saveFigmaToken(token) {
+    return __async(this, null, function* () {
+      const value = String(token || "").trim();
+      if (!value) {
+        yield figma.clientStorage.deleteAsync(TOKEN_KEY);
+        return;
+      }
+      yield figma.clientStorage.setAsync(TOKEN_KEY, value);
+    });
+  }
+  function loadFigmaToken() {
+    return __async(this, null, function* () {
+      const value = yield figma.clientStorage.getAsync(TOKEN_KEY);
+      return typeof value === "string" && value.trim() ? value.trim() : null;
+    });
+  }
+  function tokenHint(token) {
+    if (!token) return "";
+    return token.length <= 4 ? "\u2022\u2022\u2022\u2022" : `\u2022\u2022\u2022\u2022${token.slice(-4)}`;
+  }
+  var TOKEN_KEY;
+  var init_figma_token = __esm({
+    "src/plugin/figma-token.ts"() {
+      "use strict";
+      TOKEN_KEY = "figma_pat";
+    }
+  });
+
+  // src/plugin/libraries-scan/perf.ts
+  function now() {
+    return Date.now();
+  }
+  function elapsed(t0) {
+    return Date.now() - t0;
+  }
+  function logPerf(phase, ms2, extra = "") {
+    const suffix = extra ? ` \xB7 ${extra}` : "";
+    console.log(`[DR lib] ${phase}: ${ms2}ms${suffix}`);
+  }
+  function fmtSec(ms2) {
+    return `${(ms2 / 1e3).toFixed(1)}\u0441`;
+  }
+  var init_perf = __esm({
+    "src/plugin/libraries-scan/perf.ts"() {
+      "use strict";
+    }
+  });
+
+  // src/plugin/libraries-scan/rest-fetch.ts
+  function fetchJson(url, token) {
+    return __async(this, null, function* () {
+      const t0 = now();
+      const res = yield fetch(url, { headers: { "X-Figma-Token": token } });
+      if (res.status === 429) {
+        logPerf("429 retry", elapsed(t0), url.slice(0, 80));
+        yield new Promise((r) => setTimeout(r, 2e3));
+        return fetchJson(url, token);
+      }
+      if (!res.ok) return { ok: false, status: res.status, data: null, ms: elapsed(t0) };
+      return { ok: true, status: res.status, data: yield res.json(), ms: elapsed(t0) };
+    });
+  }
+  function resolveSeedFileKey(key, token) {
+    return __async(this, null, function* () {
+      var _a, _b;
+      const comp = yield fetchJson(
+        `https://api.figma.com/v1/components/${encodeURIComponent(key)}`,
+        token
+      );
+      if (comp.ok && ((_b = (_a = comp.data) == null ? void 0 : _a.meta) == null ? void 0 : _b.file_key)) return comp.data.meta.file_key;
+      return null;
+    });
+  }
+  function resolveFileName(fileKey, token) {
+    return __async(this, null, function* () {
+      var _a, _b, _c;
+      const meta = yield fetchJson(`https://api.figma.com/v1/files/${fileKey}/meta`, token);
+      const name = ((_b = (_a = meta.data) == null ? void 0 : _a.file) == null ? void 0 : _b.name) || ((_c = meta.data) == null ? void 0 : _c.name);
+      if (meta.ok && name) return name;
+      return fileKey;
+    });
+  }
+  var init_rest_fetch = __esm({
+    "src/plugin/libraries-scan/rest-fetch.ts"() {
+      "use strict";
+      init_perf();
+    }
+  });
+
+  // src/plugin/resolve-etalon-file-key.ts
+  function resolveEtalonFileKey(stored, sampleKeys, token) {
+    return __async(this, null, function* () {
+      const direct = pickFileKey(stored, figma.fileKey);
+      if (direct) return direct;
+      const pat = token === void 0 ? yield loadFigmaToken() : token;
+      if (!pat || !sampleKeys.length) return void 0;
+      for (const key of sampleKeys) {
+        if (!key || key.startsWith("broken:")) continue;
+        const fileKey = pickFileKey(yield resolveSeedFileKey(key, pat));
+        if (fileKey) return fileKey;
+      }
+      return void 0;
+    });
+  }
+  var init_resolve_etalon_file_key = __esm({
+    "src/plugin/resolve-etalon-file-key.ts"() {
+      "use strict";
+      init_figma_file_key();
+      init_figma_token();
+      init_rest_fetch();
+    }
+  });
+
+  // src/plugin/snapshot-layers.ts
   function buildLayerTree(node, layers) {
     return __async(this, null, function* () {
       const parts = [];
@@ -1335,9 +1467,7 @@
       if (itemSpacing) parts.push(`i:${itemSpacing}`);
       const font = extractFont(node);
       if (font) parts.push(`t:${font}`);
-      if (parts.length > 0) {
-        layers[node.name] = parts.join("|");
-      }
+      if (parts.length > 0) layers[node.name] = parts.join("|");
       if ("children" in node) {
         for (const child of node.children) {
           yield buildLayerTree(child, layers);
@@ -1345,6 +1475,14 @@
       }
     });
   }
+  var init_snapshot_layers = __esm({
+    "src/plugin/snapshot-layers.ts"() {
+      "use strict";
+      init_extractors();
+    }
+  });
+
+  // src/plugin/snapshot.ts
   function buildMeta(storage, source) {
     return {
       updatedAt: storage.u,
@@ -1432,16 +1570,20 @@
         throw new Error("\u041A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u044B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B. \u041E\u0442\u043A\u0440\u043E\u0439 \u0444\u0430\u0439\u043B UI-Kit \u0438 \u043F\u043E\u0432\u0442\u043E\u0440\u0438 \u0441\u043A\u0430\u043D.");
       }
       const elapsedMs = Date.now() - t0;
+      const sampleKeys = components.slice(0, 8).map((c) => c.k);
+      const fileKey = (yield resolveEtalonFileKey(figma.fileKey, sampleKeys)) || "";
       const storage = {
         c: components,
         u: (/* @__PURE__ */ new Date()).toISOString(),
-        f: figma.fileKey || "",
+        f: fileKey,
         fn: figma.root.name,
         version: version || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10).replace(/-/g, "."),
         pagesScanned,
         pagesTotal
       };
-      console.log(`[DS Snapshot] \u041F\u043E\u043B\u043D\u0430\u044F \u0437\u0430\u043C\u0435\u043D\u0430 \u044D\u0442\u0430\u043B\u043E\u043D\u0430: ${components.length} \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432, ${pagesScanned}/${pagesTotal} \u0441\u0442\u0440.`);
+      console.log(
+        `[DS Snapshot] \u042D\u0442\u0430\u043B\u043E\u043D: ${components.length} \u043A\u043E\u043C\u043F., ${pagesScanned}/${pagesTotal} \u0441\u0442\u0440., fileKey=${fileKey || "\u2014"}`
+      );
       return persist(storage, "local", { pagesScanned, pagesTotal, elapsedMs });
     });
   }
@@ -1488,7 +1630,8 @@
   var init_snapshot = __esm({
     "src/plugin/snapshot.ts"() {
       "use strict";
-      init_extractors();
+      init_resolve_etalon_file_key();
+      init_snapshot_layers();
       STORAGE_KEY = "ds_component_snapshot";
       STORAGE_KEY_META = "ds_component_snapshot_meta";
     }
@@ -1500,7 +1643,9 @@
       if (msg.type === "update-snapshot") {
         try {
           const meta = yield saveSnapshot(msg.version);
-          figma.notify(`\u2705 \u042D\u0442\u0430\u043B\u043E\u043D \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D: ${meta.count} \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432 \u0438\u0437 "${meta.fileName || meta.fileKey || "UI-Kit"}"`);
+          const src = meta.fileName || meta.fileKey || "UI-Kit";
+          const keyHint = meta.fileKey ? "" : " \xB7 fileKey \u043D\u0435 \u043F\u043E\u043B\u0443\u0447\u0435\u043D (\u043D\u0443\u0436\u0435\u043D PAT)";
+          figma.notify(`\u2705 \u042D\u0442\u0430\u043B\u043E\u043D \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D: ${meta.count} \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432 \u0438\u0437 "${src}"${keyHint}`);
           figma.ui.postMessage(__spreadValues({ type: "snapshot-saved" }, meta));
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
@@ -1902,183 +2047,88 @@
     }
   });
 
-  // src/plugin/figma-token.ts
-  function saveFigmaToken(token) {
-    return __async(this, null, function* () {
-      const value = String(token || "").trim();
-      if (!value) {
-        yield figma.clientStorage.deleteAsync(TOKEN_KEY);
-        return;
-      }
-      yield figma.clientStorage.setAsync(TOKEN_KEY, value);
-    });
-  }
-  function loadFigmaToken() {
-    return __async(this, null, function* () {
-      const value = yield figma.clientStorage.getAsync(TOKEN_KEY);
-      return typeof value === "string" && value.trim() ? value.trim() : null;
-    });
-  }
-  function tokenHint(token) {
-    if (!token) return "";
-    return token.length <= 4 ? "\u2022\u2022\u2022\u2022" : `\u2022\u2022\u2022\u2022${token.slice(-4)}`;
-  }
-  var TOKEN_KEY;
-  var init_figma_token = __esm({
-    "src/plugin/figma-token.ts"() {
-      "use strict";
-      TOKEN_KEY = "figma_pat";
-    }
-  });
-
-  // src/plugin/figma-file-key.ts
-  function isFigmaFileKey(value) {
-    if (!value || typeof value !== "string") return false;
-    if (/[\s/\\?#]/.test(value)) return false;
-    return /^[a-zA-Z0-9]{10,}$/.test(value);
-  }
-  function pickFileKey(...values) {
-    for (const value of values) {
-      if (isFigmaFileKey(value)) return value;
-    }
-    return void 0;
-  }
-  var init_figma_file_key = __esm({
-    "src/plugin/figma-file-key.ts"() {
-      "use strict";
-    }
-  });
-
   // src/plugin/libraries-scan/lib-cache.ts
   function loadResolvedCache() {
     return __async(this, null, function* () {
-      const raw = yield figma.clientStorage.getAsync(CACHE_KEY);
       const map = /* @__PURE__ */ new Map();
-      if (raw && typeof raw === "object") {
-        for (const [k, v] of Object.entries(raw)) {
-          if ((v == null ? void 0 : v.fileKey) && (v == null ? void 0 : v.libraryName) && isFigmaFileKey(v.fileKey)) map.set(k, v);
+      try {
+        const raw = yield figma.clientStorage.getAsync(CACHE_KEY);
+        if (!raw || typeof raw !== "object") return map;
+        const { libs, keys } = raw;
+        if (!libs || !keys) return map;
+        for (const [k, fileKey] of Object.entries(keys)) {
+          const libraryName = libs[fileKey];
+          if (libraryName && isFigmaFileKey(fileKey)) {
+            map.set(k, { fileKey, libraryName });
+          }
         }
+      } catch (e) {
+        return map;
       }
       return map;
     });
   }
-  function saveResolvedCache(map) {
+  function saveResolvedCache(map, keepKeys) {
     return __async(this, null, function* () {
-      const obj = {};
-      for (const [k, v] of map) obj[k] = v;
-      yield figma.clientStorage.setAsync(CACHE_KEY, obj);
+      const libs = {};
+      const keys = {};
+      let n = 0;
+      for (const key of keepKeys) {
+        if (n >= MAX_KEYS) break;
+        const v = map.get(key);
+        if (!v || !isFigmaFileKey(v.fileKey)) continue;
+        keys[key] = v.fileKey;
+        libs[v.fileKey] = v.libraryName;
+        n++;
+      }
+      try {
+        yield figma.clientStorage.setAsync(CACHE_KEY, { libs, keys });
+      } catch (e) {
+        try {
+          yield figma.clientStorage.deleteAsync(CACHE_KEY);
+          yield figma.clientStorage.setAsync(CACHE_KEY, { libs, keys });
+        } catch (e2) {
+        }
+      }
     });
   }
   function loadFailCache() {
     return __async(this, null, function* () {
-      const raw = yield figma.clientStorage.getAsync(FAIL_KEY);
-      return new Set(Array.isArray(raw) ? raw.filter((x) => typeof x === "string") : []);
+      try {
+        const raw = yield figma.clientStorage.getAsync(FAIL_KEY);
+        return new Set(Array.isArray(raw) ? raw.filter((x) => typeof x === "string") : []);
+      } catch (e) {
+        return /* @__PURE__ */ new Set();
+      }
     });
   }
   function saveFailCache(fails) {
     return __async(this, null, function* () {
-      yield figma.clientStorage.setAsync(FAIL_KEY, [...fails]);
+      const list = [...fails].slice(-MAX_FAILS);
+      try {
+        yield figma.clientStorage.setAsync(FAIL_KEY, list);
+      } catch (e) {
+        try {
+          yield figma.clientStorage.deleteAsync(FAIL_KEY);
+          yield figma.clientStorage.setAsync(FAIL_KEY, list.slice(-500));
+        } catch (e2) {
+        }
+      }
     });
   }
-  var CACHE_KEY, FAIL_KEY;
+  var CACHE_KEY, FAIL_KEY, MAX_KEYS, MAX_FAILS;
   var init_lib_cache = __esm({
     "src/plugin/libraries-scan/lib-cache.ts"() {
       "use strict";
       init_figma_file_key();
-      CACHE_KEY = "lib_key_cache_v1";
-      FAIL_KEY = "lib_key_fail_v1";
+      CACHE_KEY = "lib_key_cache_v2";
+      FAIL_KEY = "lib_key_fail_v2";
+      MAX_KEYS = 1200;
+      MAX_FAILS = 2e3;
     }
   });
 
-  // src/plugin/libraries-scan/perf.ts
-  function now() {
-    return Date.now();
-  }
-  function elapsed(t0) {
-    return Date.now() - t0;
-  }
-  function logPerf(phase, ms2, extra = "") {
-    const suffix = extra ? ` \xB7 ${extra}` : "";
-    console.log(`[DR lib] ${phase}: ${ms2}ms${suffix}`);
-  }
-  function fmtSec(ms2) {
-    return `${(ms2 / 1e3).toFixed(1)}\u0441`;
-  }
-  var init_perf = __esm({
-    "src/plugin/libraries-scan/perf.ts"() {
-      "use strict";
-    }
-  });
-
-  // src/plugin/libraries-scan/rest-fetch.ts
-  function fetchJson(url, token) {
-    return __async(this, null, function* () {
-      const t0 = now();
-      const res = yield fetch(url, { headers: { "X-Figma-Token": token } });
-      if (res.status === 429) {
-        logPerf("429 retry", elapsed(t0), url.slice(0, 80));
-        yield new Promise((r) => setTimeout(r, 2e3));
-        return fetchJson(url, token);
-      }
-      if (!res.ok) return { ok: false, status: res.status, data: null, ms: elapsed(t0) };
-      return { ok: true, status: res.status, data: yield res.json(), ms: elapsed(t0) };
-    });
-  }
-  function resolveSeedFileKey(key, token) {
-    return __async(this, null, function* () {
-      var _a, _b;
-      const comp = yield fetchJson(
-        `https://api.figma.com/v1/components/${encodeURIComponent(key)}`,
-        token
-      );
-      if (comp.ok && ((_b = (_a = comp.data) == null ? void 0 : _a.meta) == null ? void 0 : _b.file_key)) return comp.data.meta.file_key;
-      return null;
-    });
-  }
-  function resolveFileName(fileKey, token) {
-    return __async(this, null, function* () {
-      var _a, _b, _c, _d;
-      const meta = yield fetchJson(`https://api.figma.com/v1/files/${fileKey}/meta`, token);
-      const name = ((_b = (_a = meta.data) == null ? void 0 : _a.file) == null ? void 0 : _b.name) || ((_c = meta.data) == null ? void 0 : _c.name);
-      if (meta.ok && name) return name;
-      const file = yield fetchJson(`https://api.figma.com/v1/files/${fileKey}?depth=1`, token);
-      return ((_d = file.data) == null ? void 0 : _d.name) || fileKey;
-    });
-  }
-  var init_rest_fetch = __esm({
-    "src/plugin/libraries-scan/rest-fetch.ts"() {
-      "use strict";
-      init_perf();
-    }
-  });
-
-  // src/plugin/libraries-scan/rest-resolve.ts
-  function ingestLibrary(fileKey, libraryName, token, result, pending) {
-    return __async(this, null, function* () {
-      var _a, _b, _c, _d;
-      if (!isFigmaFileKey(fileKey)) return 0;
-      const t0 = now();
-      const before = pending.size;
-      const [comps, sets] = yield Promise.all([
-        fetchJson(`https://api.figma.com/v1/files/${fileKey}/components`, token),
-        fetchJson(`https://api.figma.com/v1/files/${fileKey}/component_sets`, token)
-      ]);
-      const list = [
-        ...((_b = (_a = comps.data) == null ? void 0 : _a.meta) == null ? void 0 : _b.components) || [],
-        ...((_d = (_c = sets.data) == null ? void 0 : _c.meta) == null ? void 0 : _d.component_sets) || []
-      ];
-      const resolved = { fileKey, libraryName };
-      for (const item of list) {
-        const key = item == null ? void 0 : item.key;
-        if (!key) continue;
-        result.set(key, resolved);
-        pending.delete(key);
-      }
-      const matched = before - pending.size;
-      logPerf("ingest", elapsed(t0), `${libraryName} \xB7 catalog=${list.length} \xB7 matched=${matched}`);
-      return matched;
-    });
-  }
+  // src/plugin/libraries-scan/rest-pending.ts
   function sortPending(pending, counts) {
     const arr = [...pending];
     if (!(counts == null ? void 0 : counts.size)) return arr;
@@ -2092,6 +2142,16 @@
     }
     pending.clear();
     return n;
+  }
+  var init_rest_pending = __esm({
+    "src/plugin/libraries-scan/rest-pending.ts"() {
+      "use strict";
+    }
+  });
+
+  // src/plugin/libraries-scan/rest-resolve.ts
+  function tick(onProgress, done, total, label, t0) {
+    onProgress == null ? void 0 : onProgress(done, total, `${label} \xB7 ${fmtSec(elapsed(t0))}`);
   }
   function resolveLibraryNames(_0, _1, _2) {
     return __async(this, arguments, function* (keys, token, onProgress, opts = {}) {
@@ -2110,24 +2170,20 @@
       let emptyRounds = 0;
       let round = 0;
       logPerf("resolve start", 0, `keys=${total} pending=${pending.size} cached=${cachedDone}`);
-      onProgress == null ? void 0 : onProgress(cachedDone, total, `\u041A\u044D\u0448 \xB7 ${fmtSec(elapsed(tAll))}`);
+      tick(onProgress, cachedDone, total, cachedDone ? `\u0418\u0437 \u043A\u044D\u0448\u0430 ${cachedDone}` : "\u0421\u0442\u0430\u0440\u0442 API", tAll);
       for (const fileKey of opts.knownFileKeys || []) {
         if (!isFigmaFileKey(fileKey) || fileNames.has(fileKey)) continue;
-        const tKnown = now();
-        const libraryName = yield resolveFileName(fileKey, token);
-        fileNames.set(fileKey, libraryName);
-        libs++;
-        yield ingestLibrary(fileKey, libraryName, token, result, pending);
-        logPerf("known lib", elapsed(tKnown), libraryName);
-        onProgress == null ? void 0 : onProgress(total - pending.size, total, `${libraryName} \xB7 ${fmtSec(elapsed(tAll))}`);
+        fileNames.set(fileKey, "\u042D\u0442\u0430\u043B\u043E\u043D \u0414\u0421");
       }
       while (pending.size) {
         round++;
         const tRound = now();
-        onProgress == null ? void 0 : onProgress(
+        tick(
+          onProgress,
           total - pending.size,
           total,
-          `\u0411\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A: ${libs}, \u043E\u0441\u0442\u0430\u043B\u043E\u0441\u044C: ${pending.size} \xB7 ${fmtSec(elapsed(tAll))}`
+          `\u0420\u0430\u0443\u043D\u0434 ${round}: \u043E\u043F\u0440\u043E\u0441 ${Math.min(SEED_BATCH, pending.size)} \u043A\u043B\u044E\u0447\u0435\u0439, \u043E\u0441\u0442\u0430\u043B\u043E\u0441\u044C ${pending.size}`,
+          tAll
         );
         const batch = sortPending(pending, opts.keyCounts).slice(0, SEED_BATCH);
         logPerf(`seed #${round} start`, elapsed(tAll), `batch=${batch.length} pending=${pending.size}`);
@@ -2152,26 +2208,39 @@
           list.push(key);
           byFile.set(fileKey, list);
         }
-        let ingested = 0;
+        tick(
+          onProgress,
+          total - pending.size,
+          total,
+          `\u0420\u0430\u0443\u043D\u0434 ${round}: \u043D\u0430\u0439\u0434\u0435\u043D\u043E ${hits}, 404\xD7${misses}, \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A +${byFile.size}`,
+          tAll
+        );
         for (const [fileKey, seedKeys] of byFile) {
           if (!isFigmaFileKey(fileKey)) continue;
           let libraryName = fileNames.get(fileKey);
           if (!libraryName) {
+            tick(onProgress, total - pending.size, total, "\u0418\u043C\u044F \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0438\u2026", tAll);
             libraryName = yield resolveFileName(fileKey, token);
             fileNames.set(fileKey, libraryName);
             libs++;
-            ingested += yield ingestLibrary(fileKey, libraryName, token, result, pending);
           }
           for (const seed of seedKeys) {
             if (!pending.has(seed)) continue;
             result.set(seed, { fileKey, libraryName });
             pending.delete(seed);
           }
+          tick(
+            onProgress,
+            total - pending.size,
+            total,
+            `\xAB${libraryName}\xBB \xB7 \u043E\u0441\u0442\u0430\u043B\u043E\u0441\u044C ${pending.size}`,
+            tAll
+          );
         }
         logPerf(
           `seed #${round}`,
           elapsed(tRound),
-          `hits=${hits} miss=${misses} files=${byFile.size} ingest=${ingested} pending=${pending.size}`
+          `hits=${hits} miss=${misses} files=${byFile.size} pending=${pending.size}`
         );
         if (hits === 0) {
           emptyRounds++;
@@ -2186,7 +2255,7 @@
         }
       }
       const tSave = now();
-      yield saveResolvedCache(result);
+      yield saveResolvedCache(result, unique);
       yield saveFailCache(fails);
       logPerf("cache save", elapsed(tSave));
       const mapped = unique.filter((k) => result.has(k)).length;
@@ -2195,7 +2264,7 @@
         elapsed(tAll),
         `mapped=${mapped}/${total} libs=${libs} failed=${failed} rounds=${round}`
       );
-      onProgress == null ? void 0 : onProgress(mapped, total, `\u0411\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A: ${libs} \xB7 ${fmtSec(elapsed(tAll))}`);
+      tick(onProgress, mapped, total, `\u0413\u043E\u0442\u043E\u0432\u043E \xB7 ${libs} \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A`, tAll);
       return result;
     });
   }
@@ -2206,6 +2275,7 @@
       init_lib_cache();
       init_figma_file_key();
       init_rest_fetch();
+      init_rest_pending();
       init_perf();
       SEED_BATCH = 24;
       EMPTY_STOP = 2;
@@ -2213,10 +2283,15 @@
   });
 
   // src/plugin/libraries-scan/result.ts
+  function splitGroupKey(groupKey) {
+    const i = groupKey.lastIndexOf(":");
+    if (i <= 0) return { category: groupKey, compKey: groupKey };
+    return { category: groupKey.slice(0, i), compKey: groupKey.slice(i + 1) };
+  }
   function remapByLibraries(acc, libNames, etalonFileKey) {
     const next = /* @__PURE__ */ new Map();
     for (const [groupKey, group] of acc) {
-      const compKey = groupKey.slice(groupKey.indexOf(":") + 1);
+      const { compKey } = splitGroupKey(groupKey);
       let category = group.category;
       if (category !== "broken" && category !== "etalon") {
         const resolved = libNames.get(compKey);
@@ -2229,6 +2304,8 @@
       if (!g) {
         g = { name: group.name, category, nodeIds: [] };
         next.set(nextKey, g);
+      } else if (!g.name && group.name) {
+        g.name = group.name;
       }
       g.nodeIds.push(...group.nodeIds);
     }
@@ -2237,15 +2314,15 @@
   function toLibResult(acc, counts, usedRest) {
     const buckets = /* @__PURE__ */ new Map();
     for (const [groupKey, group] of acc) {
-      const key = groupKey.slice(groupKey.indexOf(":") + 1);
+      const { compKey } = splitGroupKey(groupKey);
       let list = buckets.get(group.category);
       if (!list) {
         list = [];
         buckets.set(group.category, list);
       }
       list.push({
-        key,
-        name: group.name,
+        key: compKey,
+        name: group.name || compKey,
         count: group.nodeIds.length,
         nodeIds: group.nodeIds
       });
@@ -2283,7 +2360,7 @@
     }
   });
 
-  // src/plugin/libraries-scan/scan.ts
+  // src/plugin/libraries-scan/classify.ts
   function masterName(mc) {
     var _a;
     return ((_a = mc.parent) == null ? void 0 : _a.type) === "COMPONENT_SET" ? mc.parent.name : mc.name;
@@ -2301,7 +2378,7 @@
     }
     return out;
   }
-  function classifyInstance(node, snapshot, cache) {
+  function classifyOne(node, snapshot, cache) {
     return __async(this, null, function* () {
       let mc = null;
       try {
@@ -2316,42 +2393,36 @@
       if (!mc.remote) return null;
       const cached = cache.get(mc.key);
       if (cached !== void 0) return cached;
-      const category = (snapshot == null ? void 0 : snapshot.has(mc.key)) ? "etalon" : "foreign";
-      const result = { category, name: masterName(mc), key: mc.key };
+      const result = {
+        category: (snapshot == null ? void 0 : snapshot.has(mc.key)) ? "etalon" : "foreign",
+        name: masterName(mc),
+        key: mc.key
+      };
       cache.set(mc.key, result);
       return result;
     });
   }
-  function runLibrariesScan(roots, onProgress) {
+  function classifyAll(instances, snapshot, onProgress) {
     return __async(this, null, function* () {
-      const tAll = now();
-      figma.skipInvisibleInstanceChildren = false;
-      const snapshotData = yield loadSnapshot();
-      const snapshot = (snapshotData == null ? void 0 : snapshotData.c) ? new Set(snapshotData.c.map((s) => s.k)) : null;
-      const tCollect = now();
-      onProgress == null ? void 0 : onProgress(0, 0, "\u0421\u0431\u043E\u0440 \u0438\u043D\u0441\u0442\u0430\u043D\u0441\u043E\u0432...");
-      const instances = collectInstances(roots);
-      logPerf("collect", elapsed(tCollect), `instances=${instances.length}`);
-      let acc = /* @__PURE__ */ new Map();
       const cache = /* @__PURE__ */ new Map();
       const keyCounts = /* @__PURE__ */ new Map();
-      let remote = 0;
-      let local = 0;
-      let broken = 0;
-      const tClassify = now();
+      const acc = /* @__PURE__ */ new Map();
+      const stats = { remote: 0, local: 0, broken: 0 };
+      const total = instances.length;
+      let lastUi = 0;
       for (let i = 0; i < instances.length; i += BATCH) {
         const batch = instances.slice(i, i + BATCH);
         const results = yield Promise.all(
-          batch.map((node) => classifyInstance(node, snapshot, cache))
+          batch.map((node) => classifyOne(node, snapshot, cache))
         );
         for (let j = 0; j < results.length; j++) {
           const info = results[j];
           if (!info) {
-            local++;
+            stats.local++;
             continue;
           }
-          if (info.category === "broken") broken++;
-          else remote++;
+          if (info.category === "broken") stats.broken++;
+          else stats.remote++;
           keyCounts.set(info.key, (keyCounts.get(info.key) || 0) + 1);
           const groupKey = `${info.category}:${info.key}`;
           let group = acc.get(groupKey);
@@ -2361,33 +2432,62 @@
           }
           group.nodeIds.push(batch[j].id);
         }
-        const done = Math.min(i + BATCH, instances.length);
-        onProgress == null ? void 0 : onProgress(
-          done,
-          instances.length,
-          `\u0418\u043D\u0441\u0442\u0430\u043D\u0441\u044B ${done}/${instances.length} \xB7 ${fmtSec(elapsed(tAll))}`
-        );
-        if (done < instances.length) yield new Promise((r) => setTimeout(r, 0));
+        const done = Math.min(i + BATCH, total);
+        const t = Date.now();
+        if (t - lastUi >= 80 || done >= total) {
+          lastUi = t;
+          onProgress == null ? void 0 : onProgress(done, total);
+          yield new Promise((r) => setTimeout(r, 0));
+        }
       }
+      return { acc, cache, keyCounts, stats };
+    });
+  }
+  var BATCH;
+  var init_classify = __esm({
+    "src/plugin/libraries-scan/classify.ts"() {
+      "use strict";
+      BATCH = 40;
+    }
+  });
+
+  // src/plugin/libraries-scan/scan.ts
+  function runLibrariesScan(roots, onProgress) {
+    return __async(this, null, function* () {
+      const tAll = now();
+      figma.skipInvisibleInstanceChildren = false;
+      onProgress == null ? void 0 : onProgress(0, 0, "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u044D\u0442\u0430\u043B\u043E\u043D\u0430...");
+      const snapshotData = yield loadSnapshot();
+      const snapshot = (snapshotData == null ? void 0 : snapshotData.c) ? new Set(snapshotData.c.map((s) => s.k)) : null;
+      const etalonFileKey = pickFileKey(snapshotData == null ? void 0 : snapshotData.f);
+      onProgress == null ? void 0 : onProgress(0, 0, "\u0421\u0431\u043E\u0440 \u0438\u043D\u0441\u0442\u0430\u043D\u0441\u043E\u0432...");
+      const tCollect = now();
+      const instances = collectInstances(roots);
+      logPerf("collect", elapsed(tCollect), `instances=${instances.length}`);
+      const tClassify = now();
+      const { acc, cache, keyCounts, stats } = yield classifyAll(
+        instances,
+        snapshot,
+        (done, total) => {
+          onProgress == null ? void 0 : onProgress(done, total, `\u0418\u043D\u0441\u0442\u0430\u043D\u0441\u044B ${done}/${total} \xB7 ${fmtSec(elapsed(tAll))}`);
+        }
+      );
       logPerf(
         "classify",
         elapsed(tClassify),
-        `remote=${remote} local=${local} broken=${broken} unique=${cache.size}`
+        `remote=${stats.remote} local=${stats.local} broken=${stats.broken} unique=${cache.size}`
       );
       const token = yield loadFigmaToken();
       let usedRest = false;
+      let next = acc;
       if (token) {
         const foreignKeys = [...cache.keys()].filter((k) => !(snapshot == null ? void 0 : snapshot.has(k)));
-        const etalonKeys = cache.size - foreignKeys.length;
         logPerf(
           "rest prep",
           elapsed(tAll),
-          `foreign=${foreignKeys.length} etalonSkip=${etalonKeys} fileKey=${pickFileKey(snapshotData == null ? void 0 : snapshotData.f) || "\u2014"}`
+          `foreign=${foreignKeys.length} etalonSkip=${cache.size - foreignKeys.length} fileKey=${etalonFileKey || "\u2014"}`
         );
         if (foreignKeys.length) {
-          onProgress == null ? void 0 : onProgress(0, foreignKeys.length, `API \xB7 ${fmtSec(elapsed(tAll))}`);
-          const etalonFileKey = pickFileKey(snapshotData == null ? void 0 : snapshotData.f);
-          const knownFileKeys = etalonFileKey ? [etalonFileKey] : [];
           const tRest = now();
           const libNames = yield resolveLibraryNames(
             foreignKeys,
@@ -2395,27 +2495,26 @@
             (done, total, label) => {
               onProgress == null ? void 0 : onProgress(done, total, label || `API ${done}/${total}`);
             },
-            { knownFileKeys, keyCounts }
+            { knownFileKeys: etalonFileKey ? [etalonFileKey] : [], keyCounts }
           );
           logPerf("rest total", elapsed(tRest), `resolved=${libNames.size}`);
           usedRest = true;
-          acc = remapByLibraries(acc, libNames, etalonFileKey);
+          next = remapByLibraries(acc, libNames, etalonFileKey);
         }
       }
-      logPerf("scan done", elapsed(tAll), `instances=${instances.length} groups=${acc.size}`);
+      logPerf("scan done", elapsed(tAll), `instances=${instances.length} groups=${next.size}`);
       return toLibResult(
-        acc,
+        next,
         {
           instanceTotal: instances.length,
-          remoteCount: remote,
-          localCount: local,
-          brokenCount: broken
+          remoteCount: stats.remote,
+          localCount: stats.local,
+          brokenCount: stats.broken
         },
         usedRest
       );
     });
   }
-  var BATCH;
   var init_scan2 = __esm({
     "src/plugin/libraries-scan/scan.ts"() {
       "use strict";
@@ -2424,8 +2523,8 @@
       init_figma_file_key();
       init_rest_resolve();
       init_result();
+      init_classify();
       init_perf();
-      BATCH = 20;
     }
   });
 

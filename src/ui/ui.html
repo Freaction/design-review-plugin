@@ -1,5 +1,4 @@
 <div class="container">
-  <!-- Tabs from TODO -->
   <div class="tabs">
     <div class="tabs-left">
       <button class="tab-button active" data-page="main">Самопроверка</button>
@@ -157,35 +156,19 @@
         <div class="icon-btn scan-stats-icon" style="width: 16px; height: 16px; display: none;"></div>
         <span class="scan-stats-time">Проверено 0 слоев за 0с</span>
       </div>
-      <div class="stats-counts">
-        <div class="stat-item"><div class="dot-icon dot-error"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg></div><span class="scan-stats-error">0 блокер</span></div>
-        <div class="stat-item"><div class="dot-icon dot-warning"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg></div><span class="scan-stats-warning">0 предупр.</span></div>
-        <div class="stat-item"><div class="dot-icon dot-info"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg></div><span class="scan-stats-info">0 инфо</span></div>
-      </div>
     </div>
 
     <div id="libUsageSection" class="migrator-section hidden">
-      <div class="section-label">Компоненты по категориям</div>
-      <div class="lib-tree-wrapper">
+      <div class="section-label">Библиотеки и компоненты</div>
+      <div class="lib-tree-wrapper lib-tree-wrapper-tall">
         <div id="libUsageList" class="lib-list-inner"></div>
       </div>
       <div id="libUsageHint" class="lib-empty" style="padding-left: 0;"></div>
-    </div>
-
-    <div id="libUsagePanel" class="hidden migrator-section">
-      <div class="section-label section-label-gap">Инстансы</div>
-      <label class="switch-wrapper">
-        <input type="checkbox" class="switch-input" id="group-lib-switch" checked>
-        <div class="switch-track"></div>
-        <div class="switch-label">Группировать одинаковые</div>
-      </label>
-      <div id="libUsageResults" class="var-list var-list-migrator"></div>
     </div>
   </div>
 
   <div class="page" id="page-migrator" style="position: relative; height: 100%;">
     <div id="migrator-scroll" style="flex: 1; overflow-y: auto; padding-bottom: 72px; width: 100%; display: flex; flex-direction: column; gap: 16px;">
-      <!-- Title & Subtitle -->
       <div class="header-info">
         <div class="title">Миграция и проверка токенов</div>
         <div class="subtitle">Находит устаревшие переменные и позволяет переназначать библиотеки, чтобы свапать бренды.</div>
@@ -193,7 +176,6 @@
 
       <div class="divider"></div>
 
-      <!-- Scan Buttons -->
       <div class="buttons-row">
         <button class="btn-new-task" id="btnScanSelection">
           <div class="cta-inner-border"></div>
@@ -207,7 +189,6 @@
 
       <div class="divider"></div>
 
-      <!-- Stats area -->
       <div class="stats-info scan-stats scan-stats-compact hidden">
         <div class="stats-time">
           <div class="icon-btn scan-stats-icon" style="width: 16px; height: 16px; display: none;"></div>
@@ -221,7 +202,6 @@
         <div class="divider"></div>
       </div>
 
-      <!-- Libraries Area -->
       <div id="libraries-section" class="migrator-section">
         <div class="section-label">Выберите нужную библиотеку для проверки или миграции</div>
         <div class="lib-tree-wrapper">
@@ -259,9 +239,8 @@
         </div>
         <div id="errorMsgs" class="msgs hidden"></div>
       </div>
-    </div> <!-- migrator-scroll -->
-    
-    <!-- Pinned bottom buttons -->
+    </div>
+
     <div class="migrator-footer">
       <div class="buttons-row">
         <button class="btn-new-task" id="btnCheckMigrate" disabled>

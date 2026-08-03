@@ -28,6 +28,5 @@ export async function resolveFileName(fileKey: string, token: string): Promise<s
   const meta = await fetchJson(`https://api.figma.com/v1/files/${fileKey}/meta`, token);
   const name = meta.data?.file?.name || meta.data?.name;
   if (meta.ok && name) return name;
-  const file = await fetchJson(`https://api.figma.com/v1/files/${fileKey}?depth=1`, token);
-  return file.data?.name || fileKey;
+  return fileKey;
 }

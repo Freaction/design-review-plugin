@@ -7,6 +7,12 @@ const FALLBACK_TITLE: Record<string, string> = {
   unknown: 'Не удалось определить',
 };
 
+function splitGroupKey(groupKey: string): { category: string; compKey: string } {
+  const i = groupKey.lastIndexOf(':');
+  if (i <= 0) return { category: groupKey, compKey: groupKey };
+  return { category: groupKey.slice(0, i), compKey: groupKey.slice(i + 1) };
+}
+
 export function remapByLibraries(
   acc: LibAcc,
   libNames: Map<string, { libraryName: string; fileKey: string }>,
@@ -14,7 +20,7 @@ export function remapByLibraries(
 ): LibAcc {
   const next: LibAcc = new Map();
   for (const [groupKey, group] of acc) {
-    const compKey = groupKey.slice(groupKey.indexOf(':') + 1);
+    const { compKey } = splitGroupKey(groupKey);
     let category = group.category;
     if (category !== 'broken' && category !== 'etalon') {
       const resolved = libNames.get(compKey);
@@ -27,6 +33,8 @@ export function remapByLibraries(
     if (!g) {
       g = { name: group.name, category, nodeIds: [] };
       next.set(nextKey, g);
+    } else if (!g.name && group.name) {
+      g.name = group.name;
     }
     g.nodeIds.push(...group.nodeIds);
   }
@@ -46,15 +54,15 @@ export function toLibResult(
   const buckets = new Map<string, LibComponentGroup[]>();
 
   for (const [groupKey, group] of acc) {
-    const key = groupKey.slice(groupKey.indexOf(':') + 1);
+    const { compKey } = splitGroupKey(groupKey);
     let list = buckets.get(group.category);
     if (!list) {
       list = [];
       buckets.set(group.category, list);
     }
     list.push({
-      key,
-      name: group.name,
+      key: compKey,
+      name: group.name || compKey,
       count: group.nodeIds.length,
       nodeIds: group.nodeIds,
     });

@@ -3,10 +3,10 @@ import {
   loadResolvedCache,
   saveFailCache,
   saveResolvedCache,
-  type Resolved,
 } from './lib-cache';
 import { isFigmaFileKey } from '../figma-file-key';
-import { resolveFileName, resolveSeedFileKey, fetchJson } from './rest-fetch';
+import { resolveFileName, resolveSeedFileKey } from './rest-fetch';
+import { dropPending, sortPending } from './rest-pending';
 import { elapsed, fmtSec, logPerf, now } from './perf';
 
 const SEED_BATCH = 24;
@@ -17,58 +17,18 @@ type ResolveOpts = {
   keyCounts?: Map<string, number>;
 };
 
-async function ingestLibrary(
-  fileKey: string,
-  libraryName: string,
-  token: string,
-  result: Map<string, Resolved>,
-  pending: Set<string>,
-): Promise<number> {
-  if (!isFigmaFileKey(fileKey)) return 0;
-  const t0 = now();
-  const before = pending.size;
-  const [comps, sets] = await Promise.all([
-    fetchJson(`https://api.figma.com/v1/files/${fileKey}/components`, token),
-    fetchJson(`https://api.figma.com/v1/files/${fileKey}/component_sets`, token),
-  ]);
-  const list = [
-    ...(comps.data?.meta?.components || []),
-    ...(sets.data?.meta?.component_sets || []),
-  ];
-  const resolved = { fileKey, libraryName };
-  for (const item of list) {
-    const key = item?.key;
-    if (!key) continue;
-    result.set(key, resolved);
-    pending.delete(key);
-  }
-  const matched = before - pending.size;
-  logPerf('ingest', elapsed(t0), `${libraryName} · catalog=${list.length} · matched=${matched}`);
-  return matched;
-}
+type Progress = (done: number, total: number, label?: string) => void;
 
-function sortPending(pending: Set<string>, counts?: Map<string, number>): string[] {
-  const arr = [...pending];
-  if (!counts?.size) return arr;
-  return arr.sort((a, b) => (counts.get(b) || 0) - (counts.get(a) || 0));
-}
-
-function dropPending(pending: Set<string>, fails: Set<string>): number {
-  let n = 0;
-  for (const key of pending) {
-    fails.add(key);
-    n++;
-  }
-  pending.clear();
-  return n;
+function tick(onProgress: Progress | undefined, done: number, total: number, label: string, t0: number) {
+  onProgress?.(done, total, `${label} · ${fmtSec(elapsed(t0))}`);
 }
 
 export async function resolveLibraryNames(
   keys: string[],
   token: string,
-  onProgress?: (done: number, total: number, label?: string) => void,
+  onProgress?: Progress,
   opts: ResolveOpts = {},
-): Promise<Map<string, Resolved>> {
+): Promise<Map<string, { libraryName: string; fileKey: string }>> {
   const tAll = now();
   const unique = [...new Set(keys.filter(k => k && !k.startsWith('broken:')))];
   const total = unique.length;
@@ -87,26 +47,22 @@ export async function resolveLibraryNames(
   let round = 0;
 
   logPerf('resolve start', 0, `keys=${total} pending=${pending.size} cached=${cachedDone}`);
-  onProgress?.(cachedDone, total, `Кэш · ${fmtSec(elapsed(tAll))}`);
+  tick(onProgress, cachedDone, total, cachedDone ? `Из кэша ${cachedDone}` : 'Старт API', tAll);
 
   for (const fileKey of opts.knownFileKeys || []) {
     if (!isFigmaFileKey(fileKey) || fileNames.has(fileKey)) continue;
-    const tKnown = now();
-    const libraryName = await resolveFileName(fileKey, token);
-    fileNames.set(fileKey, libraryName);
-    libs++;
-    await ingestLibrary(fileKey, libraryName, token, result, pending);
-    logPerf('known lib', elapsed(tKnown), libraryName);
-    onProgress?.(total - pending.size, total, `${libraryName} · ${fmtSec(elapsed(tAll))}`);
+    fileNames.set(fileKey, 'Эталон ДС');
   }
 
   while (pending.size) {
     round++;
     const tRound = now();
-    onProgress?.(
+    tick(
+      onProgress,
       total - pending.size,
       total,
-      `Библиотек: ${libs}, осталось: ${pending.size} · ${fmtSec(elapsed(tAll))}`,
+      `Раунд ${round}: опрос ${Math.min(SEED_BATCH, pending.size)} ключей, осталось ${pending.size}`,
+      tAll,
     );
 
     const batch = sortPending(pending, opts.keyCounts).slice(0, SEED_BATCH);
@@ -133,27 +89,41 @@ export async function resolveLibraryNames(
       byFile.set(fileKey, list);
     }
 
-    let ingested = 0;
+    tick(
+      onProgress,
+      total - pending.size,
+      total,
+      `Раунд ${round}: найдено ${hits}, 404×${misses}, библиотек +${byFile.size}`,
+      tAll,
+    );
+
     for (const [fileKey, seedKeys] of byFile) {
       if (!isFigmaFileKey(fileKey)) continue;
       let libraryName = fileNames.get(fileKey);
       if (!libraryName) {
+        tick(onProgress, total - pending.size, total, 'Имя библиотеки…', tAll);
         libraryName = await resolveFileName(fileKey, token);
         fileNames.set(fileKey, libraryName);
         libs++;
-        ingested += await ingestLibrary(fileKey, libraryName, token, result, pending);
       }
       for (const seed of seedKeys) {
         if (!pending.has(seed)) continue;
         result.set(seed, { fileKey, libraryName });
         pending.delete(seed);
       }
+      tick(
+        onProgress,
+        total - pending.size,
+        total,
+        `«${libraryName}» · осталось ${pending.size}`,
+        tAll,
+      );
     }
 
     logPerf(
       `seed #${round}`,
       elapsed(tRound),
-      `hits=${hits} miss=${misses} files=${byFile.size} ingest=${ingested} pending=${pending.size}`,
+      `hits=${hits} miss=${misses} files=${byFile.size} pending=${pending.size}`,
     );
 
     if (hits === 0) {
@@ -170,7 +140,7 @@ export async function resolveLibraryNames(
   }
 
   const tSave = now();
-  await saveResolvedCache(result);
+  await saveResolvedCache(result, unique);
   await saveFailCache(fails);
   logPerf('cache save', elapsed(tSave));
 
@@ -180,6 +150,6 @@ export async function resolveLibraryNames(
     elapsed(tAll),
     `mapped=${mapped}/${total} libs=${libs} failed=${failed} rounds=${round}`,
   );
-  onProgress?.(mapped, total, `Библиотек: ${libs} · ${fmtSec(elapsed(tAll))}`);
+  tick(onProgress, mapped, total, `Готово · ${libs} библиотек`, tAll);
   return result;
 }

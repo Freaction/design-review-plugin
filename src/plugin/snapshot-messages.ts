@@ -4,7 +4,9 @@ export async function handleSnapshotMessage(msg: any): Promise<boolean> {
   if (msg.type === 'update-snapshot') {
     try {
       const meta = await saveSnapshot(msg.version);
-      figma.notify(`✅ Эталон обновлён: ${meta.count} компонентов из "${meta.fileName || meta.fileKey || 'UI-Kit'}"`);
+      const src = meta.fileName || meta.fileKey || 'UI-Kit';
+      const keyHint = meta.fileKey ? '' : ' · fileKey не получен (нужен PAT)';
+      figma.notify(`✅ Эталон обновлён: ${meta.count} компонентов из "${src}"${keyHint}`);
       figma.ui.postMessage({ type: 'snapshot-saved', ...meta });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

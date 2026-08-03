@@ -62,11 +62,13 @@ export function setScanProgress(count, total, label) {
   const timeStr = formatElapsed(Date.now() - scanStartTime);
   let text;
   if (label) {
-    text = `⏳ ${label}, прошло ${timeStr}`;
+    text = label.includes('·') || label.includes('%')
+      ? `⏳ ${label}`
+      : `⏳ ${label} · ${timeStr}`;
   } else if (total) {
-    text = `⏳ Сканирование... ${count} из ${total}, прошло ${timeStr}`;
+    text = `⏳ ${count}/${total} · ${timeStr}`;
   } else {
-    text = `⏳ Сканирование... ${count} узлов, прошло ${timeStr}`;
+    text = `⏳ ${count} · ${timeStr}`;
   }
   for (const root of blocks()) {
     setVisible(root, true);

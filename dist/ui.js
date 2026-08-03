@@ -653,11 +653,11 @@
     const timeStr = formatElapsed(Date.now() - scanStartTime);
     let text;
     if (label) {
-      text = `\u23F3 ${label}, \u043F\u0440\u043E\u0448\u043B\u043E ${timeStr}`;
+      text = label.includes("\xB7") || label.includes("%") ? `\u23F3 ${label}` : `\u23F3 ${label} \xB7 ${timeStr}`;
     } else if (total) {
-      text = `\u23F3 \u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435... ${count} \u0438\u0437 ${total}, \u043F\u0440\u043E\u0448\u043B\u043E ${timeStr}`;
+      text = `\u23F3 ${count}/${total} \xB7 ${timeStr}`;
     } else {
-      text = `\u23F3 \u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435... ${count} \u0443\u0437\u043B\u043E\u0432, \u043F\u0440\u043E\u0448\u043B\u043E ${timeStr}`;
+      text = `\u23F3 ${count} \xB7 ${timeStr}`;
     }
     for (const root of blocks()) {
       setVisible(root, true);
@@ -813,11 +813,62 @@
       return res.json();
     });
   }
-  function fetchRemoteSnapshot() {
+  function fmtBytes(n) {
+    if (!n || n < 0) return "0 B";
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  function fetchRemoteSnapshot(onProgress) {
     return __async(this, null, function* () {
+      var _a, _b;
       const res = yield fetch(SNAPSHOT_REMOTE.snapshotUrl, { cache: "no-store" });
       if (!res.ok) throw new Error(`\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043A\u0430\u0447\u0430\u0442\u044C \u044D\u0442\u0430\u043B\u043E\u043D (${res.status})`);
-      const data = yield res.json();
+      const total = Number(res.headers.get("content-length")) || 0;
+      const reader = (_b = (_a = res.body) == null ? void 0 : _a.getReader) == null ? void 0 : _b.call(_a);
+      if (!reader) {
+        onProgress == null ? void 0 : onProgress({ phase: "download", received: 0, total, label: "\u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435..." });
+        const data2 = yield res.json();
+        if (!data2 || !Array.isArray(data2.c)) throw new Error("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 \u0444\u043E\u0440\u043C\u0430\u0442 snapshot.json");
+        return data2;
+      }
+      const chunks = [];
+      let received = 0;
+      let lastUi = 0;
+      const t0 = Date.now();
+      while (true) {
+        const { done, value } = yield reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.byteLength;
+        const now = Date.now();
+        if (now - lastUi < 120) continue;
+        lastUi = now;
+        const pct = total ? Math.min(99, Math.round(received / total * 100)) : null;
+        onProgress == null ? void 0 : onProgress({
+          phase: "download",
+          received,
+          total,
+          elapsedMs: now - t0,
+          label: total ? `\u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435 ${pct}% \xB7 ${fmtBytes(received)} / ${fmtBytes(total)}` : `\u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435 \xB7 ${fmtBytes(received)}`
+        });
+        yield new Promise((r) => setTimeout(r, 0));
+      }
+      onProgress == null ? void 0 : onProgress({
+        phase: "parse",
+        received,
+        total: total || received,
+        elapsedMs: Date.now() - t0,
+        label: `\u0420\u0430\u0437\u0431\u043E\u0440 JSON \xB7 ${fmtBytes(received)}`
+      });
+      const bytes = new Uint8Array(received);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      const text = new TextDecoder("utf-8").decode(bytes);
+      const data = JSON.parse(text);
       if (!data || !Array.isArray(data.c)) throw new Error("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 \u0444\u043E\u0440\u043C\u0430\u0442 snapshot.json");
       return data;
     });
@@ -826,6 +877,7 @@
     if (!remoteVersion) return "unknown";
     if (!localVersion) return "outdated";
     if (localVersion === remoteVersion) return "current";
+    if (localVersion > remoteVersion) return "ahead";
     return "outdated";
   }
   var init_snapshot_remote = __esm({
@@ -835,8 +887,45 @@
     }
   });
 
-  // src/ui/self-check/snapshot-scan-stats.ts
+  // src/ui/shared/snapshot-download-ui.js
   function formatElapsed2(ms) {
+    const totalSec = Math.max(0, Math.floor((ms || 0) / 1e3));
+    const minutes = Math.floor(totalSec / 60);
+    const seconds = totalSec % 60;
+    if (minutes > 0) return `${minutes}\u043C ${seconds}\u0441`;
+    return `${seconds}\u0441`;
+  }
+  function setDownloadUi(text, tone = "warn") {
+    const btn = document.getElementById("download-snapshot");
+    const label = document.getElementById("download-snapshot-text");
+    const t1 = document.getElementById("scan-status-text1");
+    const t2 = document.getElementById("scan-status-text2");
+    if (btn) btn.disabled = true;
+    if (label) label.textContent = text.length > 42 ? `\u23F3 ${text.slice(0, 40)}\u2026` : `\u23F3 ${text}`;
+    if (t1) {
+      t1.textContent = `\u23F3 ${text}`;
+      t1.className = `status-text status-${tone}`;
+    }
+    if (t2) t2.style.display = "none";
+  }
+  function resetDownloadBtn() {
+    const btn = document.getElementById("download-snapshot");
+    const label = document.getElementById("download-snapshot-text");
+    if (btn) btn.disabled = false;
+    if (label) label.textContent = "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u044D\u0442\u0430\u043B\u043E\u043D \u0441 GitHub";
+  }
+  function onDownloadProgress(p) {
+    const elapsed = p.elapsedMs != null ? ` \xB7 ${formatElapsed2(p.elapsedMs)}` : "";
+    setDownloadUi(`${p.label || "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430"}${elapsed}`);
+  }
+  var init_snapshot_download_ui = __esm({
+    "src/ui/shared/snapshot-download-ui.js"() {
+      "use strict";
+    }
+  });
+
+  // src/ui/self-check/snapshot-scan-stats.ts
+  function formatElapsed3(ms) {
     const totalSec = Math.max(0, Math.floor((ms || 0) / 1e3));
     const minutes = Math.floor(totalSec / 60);
     const seconds = totalSec % 60;
@@ -855,7 +944,7 @@
     const statsText = document.getElementById("snapshot-scan-stats-text");
     const text1 = document.getElementById("scan-status-text1");
     const text2 = document.getElementById("scan-status-text2");
-    const elapsed = formatElapsed2(msg.elapsedMs);
+    const elapsed = formatElapsed3(msg.elapsedMs);
     const pagesPart = msg.pagesTotal ? `\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430 ${msg.pageIndex || 0}/${msg.pagesTotal}` : `\u0441\u0442\u0440. \xAB${msg.page}\xBB`;
     if (text1) {
       text1.textContent = `\u23F3 \u0421\u043A\u0430\u043D UI-Kit... ${pagesPart}, \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432: ${msg.processed || 0}, ${elapsed}`;
@@ -873,7 +962,7 @@
     if (!stats || !statsText) return;
     stats.classList.remove("hidden");
     const pages = meta.pagesTotal != null ? `${meta.pagesScanned || 0}/${meta.pagesTotal} \u0441\u0442\u0440.` : "\u2014";
-    statsText.textContent = `\u0413\u043E\u0442\u043E\u0432\u043E: ${meta.count || 0} \u043A\u043E\u043C\u043F. \xB7 ${pages} \xB7 ${formatElapsed2(meta.elapsedMs)}`;
+    statsText.textContent = `\u0413\u043E\u0442\u043E\u0432\u043E: ${meta.count || 0} \u043A\u043E\u043C\u043F. \xB7 ${pages} \xB7 ${formatElapsed3(meta.elapsedMs)}`;
   }
   var init_snapshot_scan_stats = __esm({
     "src/ui/self-check/snapshot-scan-stats.ts"() {
@@ -913,12 +1002,6 @@
       }
     }
   }
-  function resetDownloadBtn() {
-    const btn = document.getElementById("download-snapshot");
-    const label = document.getElementById("download-snapshot-text");
-    if (btn) btn.disabled = false;
-    if (label) label.textContent = "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u044D\u0442\u0430\u043B\u043E\u043D \u0441 GitHub";
-  }
   function renderStatus() {
     const badge = document.getElementById("snapshot-version-badge");
     const localVersion = (localMeta == null ? void 0 : localMeta.version) || "";
@@ -929,6 +1012,16 @@
       setScanStatus(label, "", "ok");
       if (badge) {
         badge.textContent = "\u0410\u043A\u0442\u0443\u0430\u043B\u0435\u043D";
+        badge.className = "snapshot-badge snapshot-badge-ok";
+      }
+      return;
+    }
+    if (status === "ahead") {
+      const label = `\u2139\uFE0F \u041B\u043E\u043A\u0430\u043B\u044C\u043D\u043E \u043D\u043E\u0432\u0435\u0435 \xB7 v${localVersion}, \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435 \u0443\u0441\u0442\u0430\u0440\u0435\u043B\u0430 v${remoteVersion}`;
+      setMainStatus(label, "ok");
+      setScanStatus(label, "\u042D\u043A\u0441\u043F\u043E\u0440\u0442\u0438\u0440\u0443\u0439\u0442\u0435 JSON \u0438 \u043E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 GitHub", "ok");
+      if (badge) {
+        badge.textContent = "\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u043E \u043D\u043E\u0432\u0435\u0435";
         badge.className = "snapshot-badge snapshot-badge-ok";
       }
       return;
@@ -993,23 +1086,22 @@
   }
   function downloadAndSaveRemote() {
     return __async(this, null, function* () {
-      const btn = document.getElementById("download-snapshot");
-      const label = document.getElementById("download-snapshot-text");
-      if (btn) btn.disabled = true;
-      if (label) label.textContent = "\u23F3 \u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430...";
+      var _a;
+      setDownloadUi("\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0432\u0435\u0440\u0441\u0438\u0438 \u043D\u0430 GitHub...");
       try {
         remoteCheckError = "";
         remoteMeta = yield fetchRemoteMeta();
         status = compareVersions(localMeta == null ? void 0 : localMeta.version, remoteMeta.version);
-        if (status === "current") {
-          const msg = `\u2705 \u042D\u0442\u0430\u043B\u043E\u043D \u0443\u0436\u0435 \u0430\u043A\u0442\u0443\u0430\u043B\u0435\u043D \xB7 v${remoteMeta.version} \xB7 ${formatMetaSummary(localMeta)}`;
+        if (status === "current" || status === "ahead") {
           renderStatus();
-          setScanStatus(msg, "", "ok");
-          setMainStatus(msg, "ok");
+          resetDownloadBtn();
           return;
         }
-        if (label) label.textContent = "\u23F3 \u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435...";
-        const storage = yield fetchRemoteSnapshot();
+        setDownloadUi(`\u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435 v${remoteMeta.version}...`);
+        const storage = yield fetchRemoteSnapshot(onDownloadProgress);
+        setDownloadUi(
+          `\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \xB7 ${remoteMeta.count || ((_a = storage.c) == null ? void 0 : _a.length) || 0} \u043A\u043E\u043C\u043F. v${remoteMeta.version}`
+        );
         parent.postMessage({
           pluginMessage: { type: "save-remote-snapshot", storage, remoteMeta }
         }, "*");
@@ -1017,8 +1109,6 @@
         resetDownloadBtn();
         setScanStatus(err instanceof Error ? err.message : String(err), "", "error");
         setMainStatus(err instanceof Error ? err.message : String(err), "error");
-      } finally {
-        if (status === "current") resetDownloadBtn();
       }
     });
   }
@@ -1050,6 +1140,7 @@
     "src/ui/self-check/snapshot-status.ts"() {
       "use strict";
       init_snapshot_remote();
+      init_snapshot_download_ui();
       init_snapshot_scan_stats();
       init_snapshot_scan_stats();
       localMeta = null;
@@ -1066,23 +1157,14 @@
       "use strict";
       libState = {
         result: null,
-        checked: /* @__PURE__ */ new Set(),
-        expanded: /* @__PURE__ */ new Set(["foreign", "broken"]),
-        grouped: true
+        expanded: /* @__PURE__ */ new Set()
       };
     }
   });
 
   // src/ui/libraries/tree-ui.js
-  function totalSelected() {
-    if (!libState.result) return 0;
-    let n = 0;
-    for (const cat of libState.result.categories) {
-      for (const c of cat.components) {
-        if (libState.checked.has(`${cat.id}:${c.key}`)) n += c.count;
-      }
-    }
-    return n;
+  function catCount(cat) {
+    return cat.components.reduce((n, c) => n + c.count, 0);
   }
   function renderLibTree() {
     const list = $("libUsageList");
@@ -1093,59 +1175,46 @@
       return;
     }
     for (const cat of libState.result.categories) {
-      const catKeys = cat.components.map((c) => `${cat.id}:${c.key}`);
-      const checkedCount = catKeys.filter((k) => libState.checked.has(k)).length;
-      const allChecked = checkedCount === catKeys.length && catKeys.length > 0;
-      const partial = checkedCount > 0 && !allChecked;
       const isExpanded = libState.expanded.has(cat.id);
       const rotation = isExpanded ? "0deg" : "-90deg";
-      const catCount = cat.components.reduce((n, c) => n + c.count, 0);
+      const total = catCount(cat);
       const header = document.createElement("div");
       header.className = "lib-tree-header";
       header.innerHTML = `
       <div class="lib-chevron">
-        <svg width="8" height="4" viewBox="0 0 8 4" fill="none" stroke="currentColor" stroke-width="1.2" style="transform: rotate(${rotation}); transition: transform 0.2s;"><path d="M1 1l3 2 3-2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg width="8" height="4" viewBox="0 0 8 4" fill="none" stroke="currentColor" stroke-width="1.2" style="transform: rotate(${rotation}); transition: transform 0.15s;"><path d="M1 1l3 2 3-2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
-      <div class="lib-check ${allChecked ? "checked" : partial ? "partial" : ""}"></div>
-      <div class="lib-tree-label">${x(cat.title)} \xB7 ${catCount}</div>
+      <div class="lib-tree-label">
+        <span class="lib-tree-name">${x(cat.title)}</span>
+        <span class="lib-tree-meta">${total}</span>
+      </div>
     `;
-      header.querySelector(".lib-chevron").addEventListener("click", (e) => {
-        e.stopPropagation();
+      header.addEventListener("click", () => {
         if (isExpanded) libState.expanded.delete(cat.id);
         else libState.expanded.add(cat.id);
         renderLibTree();
       });
-      header.addEventListener("click", () => {
-        for (const k of catKeys) {
-          if (allChecked) libState.checked.delete(k);
-          else libState.checked.add(k);
-        }
-        renderLibTree();
-        window.dispatchEvent(new CustomEvent("lib-selection-changed"));
-      });
       list.appendChild(header);
-      if (isExpanded) {
-        for (const c of cat.components) {
-          const id = `${cat.id}:${c.key}`;
-          const row = document.createElement("div");
-          row.className = "lib-tree-item";
-          row.innerHTML = `
-          <div class="lib-check ${libState.checked.has(id) ? "checked" : ""}"></div>
-          <div class="lib-tree-label">${x(c.name)} \xB7 ${c.count}</div>
-        `;
-          row.addEventListener("click", () => {
-            if (libState.checked.has(id)) libState.checked.delete(id);
-            else libState.checked.add(id);
-            renderLibTree();
-            window.dispatchEvent(new CustomEvent("lib-selection-changed"));
-          });
-          list.appendChild(row);
-        }
+      if (!isExpanded) continue;
+      for (const c of cat.components) {
+        const row = document.createElement("div");
+        row.className = "lib-tree-item";
+        row.title = "\u041A\u043B\u0438\u043A \u2014 \u0432\u044B\u0434\u0435\u043B\u0438\u0442\u044C \u043D\u0430 \u0445\u043E\u043B\u0441\u0442\u0435";
+        row.innerHTML = `
+        <div class="lib-tree-label">
+          <span class="lib-tree-name">${x(c.name)}</span>
+          <span class="lib-tree-meta">${c.count}</span>
+        </div>
+      `;
+        row.addEventListener("click", () => focusNodes(c.nodeIds));
+        list.appendChild(row);
       }
     }
     const hint = $("libUsageHint");
     if (hint) {
-      hint.textContent = `\u0412\u044B\u0431\u0440\u0430\u043D\u043E remote: ${totalSelected()} / ${libState.result.remoteCount}`;
+      const libs = libState.result.categories.length;
+      const comps = libState.result.categories.reduce((n, c) => n + c.components.length, 0);
+      hint.textContent = `${libs} \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A \xB7 ${comps} \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u043E\u0432 \xB7 \u043A\u043B\u0438\u043A \u043F\u043E \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u0443 \u2014 \u0444\u043E\u043A\u0443\u0441`;
     }
   }
   var init_tree_ui = __esm({
@@ -1153,111 +1222,19 @@
       "use strict";
       init_state2();
       init_helpers();
-    }
-  });
-
-  // src/ui/libraries/results-ui.js
-  function selectedItems() {
-    if (!libState.result) return [];
-    const items = [];
-    for (const cat of libState.result.categories) {
-      for (const c of cat.components) {
-        if (!libState.checked.has(`${cat.id}:${c.key}`)) continue;
-        for (const nodeId of c.nodeIds) {
-          items.push({
-            nodeId,
-            name: c.name,
-            category: cat.id,
-            errorType: c.name
-          });
-        }
-      }
-    }
-    return items;
-  }
-  function appendRow(list, { color, title, meta, nodeIds, count }) {
-    const d = document.createElement("div");
-    d.className = "var-item-new";
-    d.onclick = () => focusNodes(nodeIds);
-    const countHtml = count > 1 ? `<div class="var-item-actions"><span class="var-item-count">${count}</span></div>` : "";
-    d.innerHTML = `
-    <div class="var-item-row">
-      <div class="var-item-dot"><div class="dot-icon" style="color:${color}">${DOT_SVG3}</div></div>
-      <div class="var-item-title">
-        ${title}${meta ? ` <span class="var-item-meta">${meta}</span>` : ""}
-      </div>
-      ${countHtml}
-    </div>
-  `;
-    list.appendChild(d);
-  }
-  function renderLibResults() {
-    var _a;
-    const list = $("libUsageResults");
-    const panel = $("libUsagePanel");
-    if (!list || !panel) return;
-    const items = selectedItems();
-    if (!libState.result) {
-      panel.classList.add("hidden");
-      return;
-    }
-    panel.classList.remove("hidden");
-    list.innerHTML = "";
-    if (!items.length) {
-      list.innerHTML = '<div class="var-list-empty">\u041E\u0442\u043C\u0435\u0442\u044C\u0442\u0435 \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442\u044B \u0432 \u0441\u043F\u0438\u0441\u043A\u0435 \u0441\u043B\u0435\u0432\u0430</div>';
-      return;
-    }
-    const grouped = libState.grouped ? groupIssues(items, (item) => `${item.category}:${item.name}`) : items;
-    for (const item of grouped) {
-      const nodeIds = ((_a = item.nodeIds) == null ? void 0 : _a.length) ? item.nodeIds : item.nodeId ? [item.nodeId] : [];
-      appendRow(list, {
-        color: COLORS[item.category] || COLORS.foreign,
-        title: x(item.name),
-        meta: item.count > 1 ? `${item.count}\u0445` : "",
-        nodeIds,
-        count: item.count || 1
-      });
-    }
-  }
-  function initLibResults() {
-    var _a;
-    (_a = $("group-lib-switch")) == null ? void 0 : _a.addEventListener("change", (e) => {
-      libState.grouped = !!e.target.checked;
-      renderLibResults();
-    });
-    window.addEventListener("lib-selection-changed", renderLibResults);
-  }
-  var DOT_SVG3, COLORS;
-  var init_results_ui2 = __esm({
-    "src/ui/libraries/results-ui.js"() {
-      "use strict";
-      init_state2();
-      init_helpers();
-      init_group_issues();
       init_focus_nodes();
-      DOT_SVG3 = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 8.00004C10 8.92052 9.25383 9.66671 8.33335 9.66671C7.41288 9.66671 6.66669 8.92052 6.66669 8.00004C6.66669 7.07957 7.41288 6.33337 8.33335 6.33337C9.25383 6.33337 10 7.07957 10 8.00004Z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg>`;
-      COLORS = {
-        etalon: "#0ADB29",
-        foreign: "#F59E0B",
-        broken: "#FB3748"
-      };
     }
   });
 
   // src/ui/libraries/handlers.js
   function initLibrariesTab() {
     var _a, _b;
-    initLibResults();
     (_a = $("btnLibScanSelection")) == null ? void 0 : _a.addEventListener("click", () => {
-      var _a2;
       setBtn("btnLibScanSelection", true, '<div class="cta-inner-border"></div><span>\u0421\u043A\u0430\u043D...</span>');
-      (_a2 = $("libUsagePanel")) == null ? void 0 : _a2.classList.add("hidden");
       post("LIB_SCAN", { scope: "selection" });
     });
     (_b = $("btnLibScanPage")) == null ? void 0 : _b.addEventListener("click", () => {
-      var _a2;
       setBtn("btnLibScanPage", true, '<div class="cta-inner-border"></div><span>\u0421\u043A\u0430\u043D...</span>');
-      (_a2 = $("libUsagePanel")) == null ? void 0 : _a2.classList.add("hidden");
       post("LIB_SCAN", { scope: "page" });
     });
   }
@@ -1267,23 +1244,17 @@
     setBtn("btnLibScanSelection", false);
     setBtn("btnLibScanPage", false);
     libState.result = msg.result;
-    libState.checked = /* @__PURE__ */ new Set();
     libState.expanded = /* @__PURE__ */ new Set();
-    for (const cat of msg.result.categories) {
-      if (cat.id === "etalon") continue;
-      libState.expanded.add(cat.id);
-      for (const c of cat.components) libState.checked.add(`${cat.id}:${c.key}`);
-    }
     const r = msg.result;
-    setScanStatsComplete(r.instanceTotal, { error: 0, warning: 0, info: 0 });
+    const statsRoot = document.querySelector("#page-libraries .scan-stats");
+    if (statsRoot) statsRoot.classList.remove("hidden");
     const timeEls = document.querySelectorAll("#page-libraries .scan-stats-time");
     for (const el of timeEls) {
       const mode = r.usedRest ? "\u043F\u043E \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0430\u043C" : "\u044D\u0442\u0430\u043B\u043E\u043D / \u0432\u043D\u0435 \u044D\u0442\u0430\u043B\u043E\u043D\u0430";
-      el.textContent = `\u0418\u043D\u0441\u0442\u0430\u043D\u0441\u043E\u0432: ${r.instanceTotal} \xB7 remote: ${r.remoteCount} \xB7 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0445: ${r.localCount} \xB7 ${mode}`;
+      el.textContent = `\u0418\u043D\u0441\u0442\u0430\u043D\u0441\u043E\u0432: ${r.instanceTotal} \xB7 remote: ${r.remoteCount} \xB7 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0445: ${r.localCount}` + (r.brokenCount ? ` \xB7 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0445: ${r.brokenCount}` : "") + ` \xB7 ${mode}`;
     }
     (_a = $("libUsageSection")) == null ? void 0 : _a.classList.remove("hidden");
     renderLibTree();
-    renderLibResults();
     return true;
   }
   var init_handlers2 = __esm({
@@ -1292,8 +1263,6 @@
       init_state2();
       init_helpers();
       init_tree_ui();
-      init_results_ui2();
-      init_scan_stats();
     }
   });
 
